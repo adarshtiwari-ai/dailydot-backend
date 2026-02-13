@@ -215,7 +215,9 @@ router.post(
         totalAmount: service.price,
         name: name || req.user.name, // Fallback to user profile if not provided
         phone: phone || req.user.phone, // Fallback to user profile
-        notes
+        notes,
+        paymentMethod: "cod", // Force COD for now
+        paymentStatus: "pending"
       });
       // Populate the booking with service details
       const populatedBooking = await Booking.findById(booking._id)

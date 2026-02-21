@@ -3,10 +3,34 @@ const router = express.Router();
 const Banner = require('../models/Banner');
 const upload = require('../middleware/upload');
 
-// Get all active banners
+// Get all active banners (filtered by placement)
 router.get('/', async (req, res) => {
     try {
-        const banners = await Banner.find({ isActive: true }).sort({ sortOrder: 1 });
+        const { placement, referenceId } = req.query;
+        let query = { isActive: true };
+
+        if (placement) {
+            query.placement = placement;
+            if (referenceId && placement !== 'home') {
+                query.referenceId = referenceId;
+            } else if (placement !== 'home') {
+                // If specific placement requested but no ID, maybe return generic ones for that placement?
+                // Or maybe user wants ALL category banners? 
+                // Let's stick to strict filtering if ID provided.
+                // If placement is 'category' and no ID, return all category banners?
+            }
+        } else {
+            // Default to home if no placement specified? Or return all? 
+            // Existing app expects home banners by default or all?
+            // Let's assume existing call expects 'home' or general.
+            // Safest for backward compat: if no placement query, return everything or filtered?
+            // User request: "Update getBanners... to accept query param".
+            // Let's make it: if no params, return ALL (or just home? implementation_plan says "Filter results").
+            // Let's Default to 'home' if no query provided? No, old app might fetch all.
+            // Let's just apply filter IF params exist.
+        }
+
+        const banners = await Banner.find(query).sort({ sortOrder: 1 });
         res.json(banners);
     } catch (error) {
         res.status(500).json({ message: error.message });

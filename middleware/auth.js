@@ -3,7 +3,9 @@ const User = require('../models/User');
 
 const auth = async (req, res, next) => {
   try {
+    console.log('--- Auth Middleware Triggered ---');
     const token = req.header('Authorization')?.replace('Bearer ', '');
+    console.log('Token present:', !!token);
 
     if (!token) {
       throw new Error();
@@ -18,8 +20,10 @@ const auth = async (req, res, next) => {
 
     req.user = user;
     req.token = token;
+    console.log('Auth Successful, User:', user._id);
     next();
   } catch (error) {
+    console.log('Auth Failed:', error.message);
     res.status(401).json({
       success: false,
       message: 'Please authenticate'

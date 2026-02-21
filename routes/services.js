@@ -41,7 +41,7 @@ const router = express.Router();
  */
 router.get("/", async (req, res) => {
   try {
-    const { category, minPrice, maxPrice, search, isTopBooked, section } = req.query;
+    const { category, minPrice, maxPrice, search, isTopBooked, section, groupBy } = req.query;
 
     let query = { isActive: true };
 
@@ -62,8 +62,63 @@ router.get("/", async (req, res) => {
     }
 
     const services = await Service.find(query)
-      .populate("category", "name slug")
+      .populate("category", "name slug tags") // Ensure tags are populated for grouping logic if needed
       .sort({ createdAt: -1 });
+
+    // Handle Grouping
+    if (groupBy === 'tags' && category) {
+      // Fetch the category to get the canonical tag list
+      const Category = require("../models/Category");
+      const categoryDoc = await Category.findById(category);
+
+      if (!categoryDoc) {
+        return res.json({ success: true, count: 0, services: [] });
+      }
+
+      const grouped = {};
+      // Initialize groups based on category tags
+      if (categoryDoc.tags && categoryDoc.tags.length > 0) {
+        categoryDoc.tags.forEach(tag => {
+          grouped[tag._id.toString()] = {
+            id: tag._id,
+            title: tag.name,
+            icon: tag.icon,
+            data: []
+          };
+        });
+      }
+      // Add 'Other' group
+      grouped['other'] = { id: 'other', title: "Other Services", icon: "grid-outline", data: [] };
+
+      services.forEach(service => {
+        const tagId = service.tagId ? service.tagId.toString() : 'other';
+        if (grouped[tagId]) {
+          grouped[tagId].data.push(service);
+        } else {
+          grouped['other'].data.push(service);
+        }
+      });
+
+      // Convert to array
+      const result = [];
+      if (categoryDoc.tags) {
+        categoryDoc.tags.forEach(tag => {
+          if (grouped[tag._id.toString()].data.length > 0) {
+            result.push(grouped[tag._id.toString()]);
+          }
+        });
+      }
+      if (grouped['other'].data.length > 0) {
+        result.push(grouped['other']);
+      }
+
+      return res.json({
+        success: true,
+        count: services.length,
+        services: result, // Return formatted structure
+        isGrouped: true
+      });
+    }
 
     res.json({
       success: true,
@@ -100,10 +155,8 @@ router.get("/", async (req, res) => {
  */
 router.get("/:id", async (req, res) => {
   try {
-    const service = await Service.findById(req.params.id).populate(
-      "category",
-      "name slug"
-    );
+    const service = await Service.findById(req.params.id)
+      .populate("category", "name slug tags");
 
     if (!service) {
       return res.status(404).json({
@@ -112,11 +165,49 @@ router.get("/:id", async (req, res) => {
       });
     }
 
+    // Fetch all active services in the same category
+    const relatedServices = await Service.find({
+      category: service.category._id,
+      isActive: true
+    }).select('name price duration description images isTopBooked tagId');
+
+    // Group services by tag
+    // Structure: { [tagId]: { tagName, services: [] }, "uncategorized": [...] }
+    const groupedServices = {
+      uncategorized: []
+    };
+
+    // Initialize groups from category tags
+    if (service.category.tags && service.category.tags.length > 0) {
+      service.category.tags.forEach(tag => {
+        groupedServices[tag._id] = {
+          tagId: tag._id,
+          tagName: tag.name,
+          tagIcon: tag.icon,
+          services: []
+        };
+      });
+    }
+
+    relatedServices.forEach(s => {
+      // Don't include the current service in the list if you strictly want "other" services, 
+      // but usually for a "Service Details" screen that allows switching, you might want all.
+      // The user requirement implies "returns all services from the same category".
+
+      if (s.tagId && groupedServices[s.tagId]) {
+        groupedServices[s.tagId].services.push(s);
+      } else {
+        groupedServices.uncategorized.push(s);
+      }
+    });
+
     res.json({
       success: true,
       service,
+      groupedServices
     });
   } catch (error) {
+    console.error("Get service details error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch service",

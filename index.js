@@ -83,6 +83,7 @@ app.use("/api/v1/analytics", require("./routes/analytics"));
 app.use("/api/v1/settings", require("./routes/settings"));
 app.use("/api/v1/banners", require("./routes/banner"));
 app.use("/api/v1/quick-fixes", require("./routes/quickFix"));
+app.use("/api/v1/professionals", require("./routes/professionals"));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

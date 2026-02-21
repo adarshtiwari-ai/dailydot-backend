@@ -3,6 +3,7 @@ const { body, validationResult } = require("express-validator");
 const Booking = require("../models/Booking");
 const Service = require("../models/Service");
 const { auth, adminAuth } = require("../middleware/auth");
+const { sendPushNotification } = require("../utils/pushService");
 
 const router = express.Router();
 /**
@@ -166,8 +167,11 @@ router.post(
   "/",
   auth,
   [
-    body("serviceId").notEmpty().withMessage("Service is required"),
+    body("items").isArray({ min: 1 }).withMessage("At least one item is required"),
+    body("items.*.serviceId").notEmpty().withMessage("Service ID is required for each item"),
+    body("items.*.price").isNumeric().withMessage("Price is required for each item"),
     body("scheduledDate").isISO8601().withMessage("Valid date is required"),
+    body("scheduledTime").notEmpty().withMessage("Time slot is required"),
     body("serviceAddress.addressLine1")
       .notEmpty()
       .withMessage("Address is required"),
@@ -179,6 +183,8 @@ router.post(
     body("phone").optional().isString(),
   ],
   async (req, res) => {
+    console.log('--- NEW BOOKING REQUEST RECEIVED ---');
+    console.log('Body:', req.body);
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -189,16 +195,15 @@ router.post(
       }
 
       // ✅ ADD THIS LINE - Extract from request body
-      const { serviceId, scheduledDate, serviceAddress, notes, name, phone } = req.body;
+      const { items, scheduledDate, scheduledTime, serviceAddress, notes, name, phone } = req.body;
 
-      // Get service details
-      const service = await Service.findById(serviceId); // Now works
-      if (!service) {
-        return res.status(404).json({
-          success: false,
-          message: "Service not found",
-        });
-      }
+      // Calculate total amount from items
+      const totalAmount = items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+
+      // Verify services exist (Optional but good practice)
+      // const serviceIds = items.map(item => item.serviceId);
+      // const foundServices = await Service.find({ _id: { $in: serviceIds } });
+      // if (foundServices.length !== serviceIds.length) { ... }
 
       // Generate booking number
       const date = new Date();
@@ -208,11 +213,12 @@ router.post(
       // Create booking - Now all variables are defined
       const booking = await Booking.create({
         userId: req.user._id,
-        serviceId,
+        items, // Store the array of items
         bookingNumber,
         scheduledDate,
+        scheduledTime,
         serviceAddress,
-        totalAmount: service.price,
+        totalAmount, // Calculated sum
         name: name || req.user.name, // Fallback to user profile if not provided
         phone: phone || req.user.phone, // Fallback to user profile
         notes,
@@ -221,9 +227,11 @@ router.post(
       });
       // Populate the booking with service details
       const populatedBooking = await Booking.findById(booking._id)
-        .populate("serviceId", "name price duration")
+        .populate("items.serviceId", "name price duration")
         .populate("userId", "name email phone");
 
+      /* 
+      // TEMPORARILY DISABLED FOR DEBUGGING
       // ADD NOTIFICATION HERE (after booking creation, before response)
       try {
         const notificationService = require("../services/notification.service");
@@ -237,6 +245,7 @@ router.post(
       } catch (error) {
         console.error("Notification service error:", error);
       }
+      */
 
       res.status(201).json({
         success: true,
@@ -244,10 +253,11 @@ router.post(
         booking: populatedBooking,
       });
     } catch (error) {
-      console.error("Booking creation error:", error);
-      res.status(500).json({
+      console.error('CRITICAL BOOKING ERROR:', error);
+      return res.status(500).json({
         success: false,
-        message: "Failed to create booking",
+        message: 'Server Error',
+        error: error.message
       });
     }
   }
@@ -256,7 +266,8 @@ router.post(
 router.get("/my-bookings", auth, async (req, res) => {
   try {
     const bookings = await Booking.find({ userId: req.user._id })
-      .populate("serviceId", "name price duration")
+      .populate("items.serviceId", "name price duration")
+      .populate("assignedPro", "name phone averageRating totalRatings") // Populate pro details
       .sort({ createdAt: -1 });
 
     res.json({
@@ -276,8 +287,9 @@ router.get("/my-bookings", auth, async (req, res) => {
 router.get("/:id", auth, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
-      .populate("serviceId", "name price duration")
-      .populate("userId", "name email phone");
+      .populate("items.serviceId", "name price duration")
+      .populate("userId", "name email phone")
+      .populate("assignedPro", "name phone averageRating totalRatings"); // Populate pro details
 
     if (!booking) {
       return res.status(404).json({
@@ -317,6 +329,9 @@ router.patch(
     body("status")
       .isIn(["pending", "confirmed", "completed", "cancelled"])
       .withMessage("Invalid status"),
+    // Optional fields for assigning pro
+    body("proName").optional().isString(),
+    body("proPhone").optional().isString(),
   ],
   async (req, res) => {
     try {
@@ -328,11 +343,38 @@ router.patch(
         });
       }
 
+      const { status, proName, proPhone } = req.body;
+      let assignedProId = null;
+
+      // Logic for Assigning Professional on Confirmation
+      if (status === 'confirmed' && proName && proPhone) {
+        const Professional = require('../models/Professional');
+
+        // Find existing pro by phone
+        let pro = await Professional.findOne({ phone: proPhone });
+
+        if (!pro) {
+          // Create new pro
+          pro = await Professional.create({
+            name: proName,
+            phone: proPhone
+          });
+          console.log(`New Professional Created: ${pro.name}`);
+        }
+
+        assignedProId = pro._id;
+      }
+
+      const updateData = { status };
+      if (assignedProId) {
+        updateData.assignedPro = assignedProId;
+      }
+
       const booking = await Booking.findByIdAndUpdate(
         req.params.id,
-        { status: req.body.status },
+        updateData,
         { new: true }
-      );
+      ).populate('assignedPro'); // Populate to return the pro details
 
       if (!booking) {
         return res.status(404).json({
@@ -346,7 +388,29 @@ router.patch(
         message: "Booking status updated successfully",
         booking,
       });
+
+      // Trigger Push Notifications based on status
+      try {
+        if (status === 'confirmed') {
+          await sendPushNotification(
+            booking.userId,
+            'Booking Confirmed! 🎉',
+            'Your professional has been assigned and is on the way.',
+            { screen: 'History', bookingId: booking._id.toString() }
+          );
+        } else if (status === 'completed') {
+          await sendPushNotification(
+            booking.userId,
+            'Service Complete ✅',
+            'Please tap here to rate your professional and view your receipt.',
+            { screen: 'History', bookingId: booking._id.toString() }
+          );
+        }
+      } catch (notifyError) {
+        console.error("Non-blocking notification error:", notifyError);
+      }
     } catch (error) {
+      console.error("Update Status Error:", error);
       res.status(500).json({
         success: false,
         message: "Failed to update booking",
@@ -529,13 +593,97 @@ router.post("/:id/confirm-cod", auth, async (req, res) => {
   }
 });
 
-// Get all bookings (admin only)
+// Rate a booking
+router.patch(
+  "/:id/rate",
+  auth,
+  [
+    body("serviceRating").isInt({ min: 1, max: 5 }).withMessage("Service rating must be 1-5"),
+    body("proRating").isInt({ min: 1, max: 5 }).withMessage("Professional rating must be 1-5"),
+    body("comment").optional().isString()
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, errors: errors.array() });
+      }
+
+      const { serviceRating, proRating, comment } = req.body;
+      const booking = await Booking.findById(req.params.id);
+
+      if (!booking) {
+        return res.status(404).json({ success: false, message: "Booking not found" });
+      }
+
+      // Check ownership
+      if (booking.userId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ success: false, message: "Access denied" });
+      }
+
+      // Check if already rated
+      if (booking.isRated) {
+        return res.status(400).json({ success: false, message: "Booking already rated" });
+      }
+
+      // Update Booking
+      booking.serviceRating = serviceRating;
+      booking.proRating = proRating;
+      booking.comment = comment;
+      booking.isRated = true;
+      await booking.save();
+
+      // Update Service Average Rating
+      // We need to aggregate all ratings for this service
+      // Note: Booking items is an array, usually we rate the main service.
+      // For simplicity, we'll attribute the rating to the first service in the booking items.
+      if (booking.items && booking.items.length > 0) {
+        const serviceId = booking.items[0].serviceId;
+        const Service = require("../models/Service");
+
+        const service = await Service.findById(serviceId);
+        if (service) {
+          const newTotalRatings = (service.totalRatings || 0) + 1;
+          const currentTotalScore = (service.averageRating || 0) * (service.totalRatings || 0);
+          const newAverage = (currentTotalScore + serviceRating) / newTotalRatings;
+
+          service.totalRatings = newTotalRatings;
+          service.averageRating = newAverage;
+          await service.save();
+        }
+      }
+
+      // Update Professional Average Rating
+      if (booking.assignedPro) {
+        const Professional = require("../models/Professional");
+        const pro = await Professional.findById(booking.assignedPro);
+        if (pro) {
+          const newTotalRatings = (pro.totalRatings || 0) + 1;
+          const currentTotalScore = (pro.averageRating || 0) * (pro.totalRatings || 0);
+          const newAverage = (currentTotalScore + proRating) / newTotalRatings;
+
+          pro.totalRatings = newTotalRatings;
+          pro.averageRating = newAverage;
+          await pro.save();
+        }
+      }
+
+      res.json({ success: true, message: "Rating submitted successfully", booking });
+
+    } catch (error) {
+      console.error("Rating Error:", error);
+      res.status(500).json({ success: false, message: "Failed to submit rating" });
+    }
+  }
+);
+
 router.get("/", [auth, adminAuth], async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 0;
     const bookings = await Booking.find()
-      .populate("serviceId", "name price")
-      .populate("userId", "name email phone")
+      .populate("items.serviceId", "name price")
+      .populate("userId", "name phone email")
+      .populate("assignedPro", "name phone averageRating totalRatings") // Populate pro details
       .sort({ createdAt: -1 })
       .limit(limit);
 

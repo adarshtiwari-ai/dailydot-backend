@@ -61,7 +61,7 @@ exports.getMetrics = async (req, res) => {
         activeServices,
         // Mock growth for now as 0 or calculate if needed. 
         // Real calculation requires historical data queries which might be heavy.
-        bookingGrowth: 0, 
+        bookingGrowth: 0,
         revenueGrowth: 0,
         userGrowth: 0,
         serviceGrowth: 0
@@ -76,7 +76,7 @@ exports.getMetrics = async (req, res) => {
 exports.getRevenueChart = async (req, res) => {
   try {
     const { period } = req.query; // '7days', '30days', '6months', '12months'
-    
+
     let startDate = new Date();
     if (period === '7days') startDate.setDate(startDate.getDate() - 7);
     else if (period === '30days') startDate.setDate(startDate.getDate() - 30);
@@ -103,7 +103,7 @@ exports.getRevenueChart = async (req, res) => {
 
     // Fill in missing dates if needed, but for now returned data is fine.
     // Frontend is expecting { name: 'Date', revenue: amount }
-    
+
     const formattedData = revenueData.map(item => ({
       name: item._id, // Date string
       revenue: item.amount,
@@ -123,9 +123,10 @@ exports.getRevenueChart = async (req, res) => {
 exports.getServiceDistribution = async (req, res) => {
   try {
     const distribution = await Booking.aggregate([
+      { $unwind: "$items" },
       {
         $group: {
-          _id: "$serviceId",
+          _id: "$items.serviceId",
           count: { $sum: 1 }
         }
       },
@@ -153,7 +154,7 @@ exports.getServiceDistribution = async (req, res) => {
       data: distribution
     });
   } catch (error) {
-     console.error("Error fetching service distribution:", error);
+    console.error("Error fetching service distribution:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };

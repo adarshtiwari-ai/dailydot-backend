@@ -6,6 +6,16 @@ const userSchema = new mongoose.Schema({
     unique: true,
     sparse: true
   },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  appleId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
   name: {
     type: String,
     required: true,
@@ -23,10 +33,14 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: true,
-    unique: true
+    unique: true,
+    sparse: true,
   },
   fcmToken: {
+    type: String,
+    select: false
+  },
+  pushToken: {
     type: String,
     select: false
   },
@@ -46,7 +60,9 @@ const userSchema = new mongoose.Schema({
     city: String,
     state: String,
     pincode: String,
-    isDefault: Boolean
+    receiverName: String,
+    receiverPhone: String,
+    isDefault: Boolean,
   }],
   isActive: {
     type: Boolean,
@@ -57,6 +73,10 @@ const userSchema = new mongoose.Schema({
     default: false
   },
   phoneVerified: {
+    type: Boolean,
+    default: false
+  },
+  isVerified: {
     type: Boolean,
     default: false
   },

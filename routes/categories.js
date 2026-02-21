@@ -118,7 +118,14 @@ router.get("/:id", async (req, res) => {
  */
 router.post(
   "/",
-  [auth, adminAuth, upload.single("image")],
+  [
+    auth,
+    adminAuth,
+    upload.fields([
+      { name: "image", maxCount: 1 },
+      { name: "tagIcons", maxCount: 10 },
+    ]),
+  ],
   [
     body("name").notEmpty().withMessage("Name is required"),
     body("slug").notEmpty().withMessage("Slug is required"),
@@ -127,19 +134,72 @@ router.post(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, errors: errors.array() });
+      }
+
+      console.log("Create Category Request Body:", req.body);
+      if (req.files) {
+        console.log("Files received:", Object.keys(req.files));
+      }
+
+      const { name, slug, description, sortOrder, isActive } = req.body;
+
+      // Check if category exists
+      let category = await Category.findOne({ slug });
+      if (category) {
         return res.status(400).json({
           success: false,
-          errors: errors.array(),
+          message: "Category already exists",
         });
       }
 
-      // Handle image upload
-      if (req.file) {
+      // Handle Image Upload
+      let imageUrl = "";
+      if (req.files && req.files.image && req.files.image[0]) {
         // Replace backslashes with forward slashes for URL compatibility
-        req.body.image = `/uploads/${req.file.filename.replace(/\\/g, "/")}`;
+        imageUrl = `/uploads/${req.files.image[0].filename.replace(/\\/g, "/")}`;
       }
 
-      const category = await Category.create(req.body);
+      // Handle tags (if sent as stringified JSON from FormData)
+      let tags = [];
+      if (req.body.tags) {
+        if (typeof req.body.tags === 'string') {
+          try {
+            tags = JSON.parse(req.body.tags);
+          } catch (e) {
+            console.error("Error parsing tags:", e);
+          }
+        } else if (Array.isArray(req.body.tags)) {
+          tags = req.body.tags;
+        }
+      }
+
+      // Process Tag Icons
+      if (req.files && req.files.tagIcons) {
+        const tagIcons = req.files.tagIcons;
+
+        // Map uploaded files to tags
+        tags = tags.map(tag => {
+          if (tag.icon && tag.icon.startsWith("TAG_FILE_INDEX_")) {
+            const indexIndex = parseInt(tag.icon.replace("TAG_FILE_INDEX_", ""), 10);
+            if (!isNaN(indexIndex) && tagIcons[indexIndex]) {
+              // Replace backslashes with forward slashes for URL compatibility
+              return { ...tag, icon: `/uploads/${tagIcons[indexIndex].filename.replace(/\\/g, "/")}` };
+            }
+          }
+          return tag;
+        });
+      }
+
+      category = await Category.create({
+        name,
+        slug,
+        description,
+        image: imageUrl,
+        sortOrder: sortOrder || 0,
+        isActive: isActive === "true" || isActive === true,
+        tags: tags,
+      });
 
       res.status(201).json({
         success: true,
@@ -147,6 +207,7 @@ router.post(
         category,
       });
     } catch (error) {
+      console.error("Create category error:", error);
       res.status(500).json({
         success: false,
         message: "Failed to create category",
@@ -187,38 +248,80 @@ router.post(
  *       404:
  *         description: Category not found
  */
-router.put("/:id", [auth, adminAuth, upload.single("image")], async (req, res) => {
-  try {
-    // Handle image upload
-    if (req.file) {
-      // Replace backslashes with forward slashes for URL compatibility
-      req.body.image = `/uploads/${req.file.filename.replace(/\\/g, "/")}`;
-    }
+router.put("/:id",
+  [
+    auth,
+    adminAuth,
+    upload.fields([
+      { name: "image", maxCount: 1 },
+      { name: "tagIcons", maxCount: 10 },
+    ])
+  ],
+  async (req, res) => {
+    try {
+      let category = await Category.findById(req.params.id);
 
-    const category = await Category.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+      if (!category) {
+        return res.status(404).json({
+          success: false,
+          message: "Category not found",
+        });
+      }
 
-    if (!category) {
-      return res.status(404).json({
+      console.log("Update Category Request Body:", req.body);
+
+      const fieldsToUpdate = { ...req.body };
+
+      // Handle Image Upload
+      if (req.files && req.files.image && req.files.image[0]) {
+        fieldsToUpdate.image = `/uploads/${req.files.image[0].filename.replace(/\\/g, "/")}`;
+      }
+
+      // Handle tags parsing
+      if (fieldsToUpdate.tags) {
+        if (typeof fieldsToUpdate.tags === 'string') {
+          try {
+            fieldsToUpdate.tags = JSON.parse(fieldsToUpdate.tags);
+          } catch (e) {
+            console.error("Error parsing tags:", e);
+          }
+        }
+      }
+
+      // Process Tag Icons
+      if (req.files && req.files.tagIcons && Array.isArray(fieldsToUpdate.tags)) {
+        const tagIcons = req.files.tagIcons;
+
+        // Map uploaded files to tags
+        fieldsToUpdate.tags = fieldsToUpdate.tags.map(tag => {
+          if (tag.icon && tag.icon.startsWith("TAG_FILE_INDEX_")) {
+            const indexIndex = parseInt(tag.icon.replace("TAG_FILE_INDEX_", ""), 10);
+            if (!isNaN(indexIndex) && tagIcons[indexIndex]) {
+              return { ...tag, icon: `/uploads/${tagIcons[indexIndex].filename.replace(/\\/g, "/")}` };
+            }
+          }
+          return tag;
+        });
+      }
+
+      category = await Category.findByIdAndUpdate(req.params.id, fieldsToUpdate, {
+        new: true,
+        runValidators: true,
+      });
+
+      res.json({
+        success: true,
+        message: "Category updated successfully",
+        category,
+      });
+    } catch (error) {
+      console.error("Update category error:", error);
+      res.status(500).json({
         success: false,
-        message: "Category not found",
+        message: "Failed to update category",
       });
     }
-
-    res.json({
-      success: true,
-      message: "Category updated successfully",
-      category,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to update category",
-    });
-  }
-});
+  });
 
 /**
  * @swagger

@@ -27,7 +27,10 @@ const serviceSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  tags: [String],
+  tagId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: false // Not all services might have a tag initially
+  },
   isTopBooked: {
     type: Boolean,
     default: false
@@ -36,6 +39,14 @@ const serviceSchema = new mongoose.Schema({
     type: String,
     enum: ['general', 'car_on_wheels', 'decor'],
     default: 'general'
+  },
+  averageRating: {
+    type: Number,
+    default: 0
+  },
+  totalRatings: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true,

@@ -24,7 +24,14 @@ const categorySchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  tags: [String]
+  sortOrder: {
+    type: Number,
+    default: 0
+  },
+  tags: [{
+    name: { type: String, required: true },
+    icon: { type: String, required: true } // Ionicon name
+  }]
 }, {
   timestamps: true,
   toJSON: {

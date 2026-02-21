@@ -7,11 +7,27 @@ const bookingSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    serviceId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Service",
-      required: true,
-    },
+    items: [
+      {
+        serviceId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Service",
+          required: true,
+        },
+        name: {
+          type: String,
+          required: true,
+        },
+        price: {
+          type: Number,
+          required: true,
+        },
+        category: {
+          type: String,
+          // required: true // Optional if not always available
+        },
+      },
+    ],
     // Booking Contact Details
     name: {
       type: String,
@@ -30,6 +46,10 @@ const bookingSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    scheduledTime: {
+      type: String,
+      required: true,
+    },
     status: {
       type: String,
       enum: ["pending", "confirmed", "assigned", "on_the_way", "in_progress", "completed", "cancelled"],
@@ -43,6 +63,12 @@ const bookingSchema = new mongoose.Schema(
     workerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      default: null
+    },
+    // New Professional Reference
+    assignedPro: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Professional",
       default: null
     },
     workerLocation: {
@@ -81,8 +107,25 @@ const bookingSchema = new mongoose.Schema(
       addressLine2: String,
       city: String,
       state: String,
+      state: String,
       pincode: String,
+      receiverName: String,
+      receiverPhone: String,
     },
+    // Ratings
+    serviceRating: {
+      type: Number,
+      default: 0
+    },
+    proRating: {
+      type: Number,
+      default: 0
+    },
+    comment: String,
+    isRated: {
+      type: Boolean,
+      default: false
+    }
   },
   {
     timestamps: true,

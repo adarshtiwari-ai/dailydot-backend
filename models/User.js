@@ -38,11 +38,11 @@ const userSchema = new mongoose.Schema({
   },
   fcmToken: {
     type: String,
-    select: false
+    default: ''
   },
   pushToken: {
     type: String,
-    select: false
+    default: ''
   },
   role: {
     type: String,

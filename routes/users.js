@@ -113,7 +113,7 @@ router.put(
       }
 
       const updates = {};
-      ["name", "phone"].forEach((field) => {
+      ["name", "phone", "pushToken"].forEach((field) => {
         if (req.body[field]) updates[field] = req.body[field];
       });
 
@@ -154,11 +154,12 @@ router.patch(
         });
       }
 
-      // Explicitly extract only name and email. Ignore phone and identity fields.
-      const { name, email } = req.body;
+      // Explicitly extract only name, email and pushToken.
+      const { name, email, pushToken } = req.body;
       const updates = {};
       if (name) updates.name = name;
       if (email) updates.email = email;
+      if (pushToken) updates.pushToken = pushToken;
 
       const user = await User.findByIdAndUpdate(
         req.user._id,

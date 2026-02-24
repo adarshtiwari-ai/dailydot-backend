@@ -317,3 +317,41 @@ exports.refreshToken = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 };
+// @desc    Update User Profile (Push Token, etc)
+// @route   PUT /api/v1/auth/update-profile
+// @access  Private
+exports.updateProfile = async (req, res) => {
+    try {
+        const { pushToken, phone, name, email } = req.body;
+
+        // Final update to match user's specific template for debugging
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user.id || req.user._id,
+            {
+                name,
+                email,
+                phone,
+                pushToken
+            },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        res.json({
+            success: true,
+            message: "Profile updated successfully",
+            user: updatedUser
+        });
+    } catch (error) {
+        console.error("Update profile error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update profile"
+        });
+    }
+};
+
+module.exports = exports;

@@ -15,6 +15,9 @@ router.post('/verify-otp', authController.verifyOtp);
 // @route   POST /api/v1/auth/social-login
 router.post('/social-login', authController.socialLogin);
 
+// @route   PUT /api/v1/auth/update-profile
+router.put('/update-profile', auth, authController.updateProfile);
+
 // @route   POST /api/v1/auth/login
 router.post('/login', authController.login);
 

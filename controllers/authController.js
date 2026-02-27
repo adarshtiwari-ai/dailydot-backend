@@ -1,6 +1,4 @@
-const User = require('../models/User');
-const jwt = require('jsonwebtoken');
-const bcryptjs = require('bcryptjs');
+const admin = require('../config/firebase');
 
 // Helper to generate tokens
 const generateTokens = (user) => {
@@ -19,52 +17,31 @@ const generateTokens = (user) => {
     return { accessToken, refreshToken };
 };
 
-// @desc    Send OTP
-// @route   POST /api/v1/auth/send-otp
+// @desc    Firebase Auth Login/Signup
+// @route   POST /api/v1/auth/firebase-login
 // @access  Public
-exports.sendOtp = async (req, res) => {
+exports.firebaseLogin = async (req, res) => {
     try {
-        const { phone } = req.body;
+        const { idToken, deviceId, name } = req.body;
 
-        if (!phone) {
-            return res.status(400).json({ success: false, message: 'Phone number is required' });
+        if (!idToken) {
+            return res.status(400).json({ success: false, message: 'Firebase ID Token is required' });
         }
 
-        // Mock OTP generation (In production, integrate Twilio/Firebase)
-        const otp = '1234';
+        // Verify Firebase Token
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        const { phone_number, uid } = decodedToken;
 
-        // In a real app, store this OTP in Redis or DB with expiration
-        // For MVP/Mock, we trust the client will send back '1234'
-
-        console.log(`OTP for ${phone}: ${otp}`);
-
-        res.status(200).json({
-            success: true,
-            message: 'OTP sent successfully',
-            // In dev/test, might verify immediately, but usually don't send OTP in response
-        });
-
-    } catch (error) {
-        console.error('Send OTP Error:', error);
-        res.status(500).json({ success: false, message: 'Server error sending OTP' });
-    }
-};
-
-// @desc    Verify OTP
-// @route   POST /api/v1/auth/verify-otp
-// @access  Public
-exports.verifyOtp = async (req, res) => {
-    try {
-        const { phone, code, deviceId, name } = req.body;
-
-        if (!phone || !code) {
-            return res.status(400).json({ success: false, message: 'Phone and Code are required' });
+        if (!phone_number) {
+            return res.status(400).json({
+                success: false,
+                message: 'Phone number not found in Firebase token'
+            });
         }
 
-        // Verify Mock OTP
-        if (code !== '1234') {
-            return res.status(400).json({ success: false, message: 'Invalid OTP' });
-        }
+        // Standardize phone number format (remove '+' if needed, matching our DB format)
+        // Usually, we store 10 digits without country code or with '91'
+        const phone = phone_number.replace('+91', '').replace('+', '');
 
         // Check if user exists
         let user = await User.findOne({ phone });
@@ -75,14 +52,20 @@ exports.verifyOtp = async (req, res) => {
                 user.isVerified = true;
                 await user.save();
             }
+            // Update firebaseUid if missing
+            if (!user.firebaseUid) {
+                user.firebaseUid = uid;
+                await user.save();
+            }
         } else {
             // New User Registration
             user = await User.create({
                 phone,
-                name: name || 'User', // Default or provided name
+                name: name || 'User',
                 isVerified: true,
+                firebaseUid: uid,
                 deviceId: deviceId || undefined,
-                // Email/Password optional for OTP users
+                role: 'user'
             });
         }
 
@@ -94,7 +77,8 @@ exports.verifyOtp = async (req, res) => {
             accessToken,
             refreshToken,
             user: {
-                id: user._id,
+                id: user._id, // Keep consistent with existing frontend expectations
+                _id: user._id,
                 name: user.name,
                 phone: user.phone,
                 role: user.role,
@@ -103,8 +87,8 @@ exports.verifyOtp = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Verify OTP Error:', error);
-        res.status(500).json({ success: false, message: 'Server error verifying OTP' });
+        console.error('Firebase Login Error:', error);
+        res.status(401).json({ success: false, message: 'Invalid Firebase Token or Server Error' });
     }
 };
 

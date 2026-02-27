@@ -6,11 +6,8 @@ const User = require('../models/User'); // For any inline logic if needed
 
 // --- New Hybrid Auth Routes ---
 
-// @route   POST /api/v1/auth/send-otp
-router.post('/send-otp', authController.sendOtp);
-
-// @route   POST /api/v1/auth/verify-otp
-router.post('/verify-otp', authController.verifyOtp);
+// @route   POST /api/v1/auth/firebase-login
+router.post('/firebase-login', authController.firebaseLogin);
 
 // @route   POST /api/v1/auth/social-login
 router.post('/social-login', authController.socialLogin);

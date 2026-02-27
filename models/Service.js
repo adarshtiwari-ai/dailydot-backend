@@ -23,6 +23,10 @@ const serviceSchema = new mongoose.Schema({
     default: 60
   },
   images: [String],
+  imageUrl: {
+    type: String,
+    default: ''
+  },
   isActive: {
     type: Boolean,
     default: true

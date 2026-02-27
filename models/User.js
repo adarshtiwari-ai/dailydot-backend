@@ -36,6 +36,10 @@ const userSchema = new mongoose.Schema({
     unique: true,
     sparse: true,
   },
+  profilePicture: {
+    type: String,
+    default: ''
+  },
   fcmToken: {
     type: String,
     default: ''
@@ -63,6 +67,8 @@ const userSchema = new mongoose.Schema({
     receiverName: String,
     receiverPhone: String,
     isDefault: Boolean,
+    latitude: Number,
+    longitude: Number,
   }],
   isActive: {
     type: Boolean,

@@ -1,36 +1,16 @@
 const emailService = require("./email.service");
 const smsService = require("./sms.service");
-const admin = require("../config/firebase");
+const { sendPushNotification } = require("../utils/pushService");
 const User = require("../models/User");
 
 class NotificationService {
   // Send Push Notification
   async sendPushNotification(userId, title, body, data = {}) {
     try {
-      if (!admin) return { success: false, error: "Firebase not initialized" };
-
-      const user = await User.findById(userId).select("+fcmToken");
-      if (!user || !user.fcmToken) {
-        return { success: false, error: "User or Token not found" };
-      }
-
-      const message = {
-        notification: {
-          title,
-          body,
-        },
-        data: {
-          ...data,
-          messageId: new Date().getTime().toString(),
-        },
-        token: user.fcmToken,
-      };
-
-      const response = await admin.messaging().send(message);
-      console.log("Successfully sent push notification:", response);
-      return { success: true, response };
+      const tickets = await sendPushNotification(userId, title, body, data);
+      return { success: true, tickets };
     } catch (error) {
-      console.error("Error sending push notification:", error);
+      console.error("Error sending push notification via Expo:", error);
       return { success: false, error: error.message };
     }
   }
@@ -77,7 +57,10 @@ class NotificationService {
           break;
         case "status_update":
           results.email = await emailService.sendStatusUpdate(booking, user);
-          booking.status
+          results.sms = await smsService.sendStatusUpdate(
+            user.phone,
+            booking.bookingNumber,
+            booking.status
           );
           results.push = await this.sendPushNotification(
             user._id,

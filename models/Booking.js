@@ -125,7 +125,10 @@ const bookingSchema = new mongoose.Schema(
     isRated: {
       type: Boolean,
       default: false
-    }
+    },
+    servicePhotos: [{
+      type: String
+    }]
   },
   {
     timestamps: true,

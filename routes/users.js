@@ -113,8 +113,8 @@ router.put(
       }
 
       const updates = {};
-      ["name", "phone", "pushToken"].forEach((field) => {
-        if (req.body[field]) updates[field] = req.body[field];
+      ["name", "phone", "pushToken", "profilePicture"].forEach((field) => {
+        if (req.body[field] !== undefined) updates[field] = req.body[field];
       });
 
       const user = await User.findByIdAndUpdate(req.user._id, updates, {
@@ -155,11 +155,12 @@ router.patch(
       }
 
       // Explicitly extract only name, email and pushToken.
-      const { name, email, pushToken } = req.body;
+      const { name, email, pushToken, profilePicture } = req.body;
       const updates = {};
       if (name) updates.name = name;
       if (email) updates.email = email;
       if (pushToken) updates.pushToken = pushToken;
+      if (profilePicture !== undefined) updates.profilePicture = profilePicture;
 
       const user = await User.findByIdAndUpdate(
         req.user._id,

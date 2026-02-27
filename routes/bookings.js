@@ -230,22 +230,19 @@ router.post(
         .populate("items.serviceId", "name price duration")
         .populate("userId", "name email phone");
 
-      /* 
-      // TEMPORARILY DISABLED FOR DEBUGGING
       // ADD NOTIFICATION HERE (after booking creation, before response)
       try {
         const notificationService = require("../services/notification.service");
         notificationService
           .sendNotification("booking_confirmation", {
             booking: populatedBooking,
-            user: req.user,
+            user: populatedBooking.userId,
           })
           .then(() => console.log("Booking confirmation sent"))
           .catch((err) => console.error("Notification error:", err));
       } catch (error) {
         console.error("Notification service error:", error);
       }
-      */
 
       res.status(201).json({
         success: true,

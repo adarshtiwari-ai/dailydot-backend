@@ -154,7 +154,7 @@ router.post(
       }
 
       // Handle Image Upload
-      let imageUrl = "";
+      let imageUrl = req.body.image || "";
       if (req.files && req.files.image && req.files.image[0]) {
         // Replace backslashes with forward slashes for URL compatibility
         imageUrl = `/uploads/${req.files.image[0].filename.replace(/\\/g, "/")}`;

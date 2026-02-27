@@ -1,32 +1,20 @@
 const admin = require("firebase-admin");
+const path = require("path");
 
-// Initialize Firebase Admin with credentials
-// You should download your service account key from Firebase Console
-// and save it as 'firebase-service-account.json' in this directory.
-// Or set GOOGLE_APPLICATION_CREDENTIALS environment variable.
+if (!admin.apps.length) {
+    try {
+        const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || path.join(__dirname, "..", "firebase-service-account.json");
 
-let firebaseApp;
-
-try {
-    // Check if service account file exists or env var is set
-    const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || "../firebase-service-account.json";
-
-    if (serviceAccountPath) {
-        // Need to resolve path relative to this file if it's a relative path
-        const resolvedPath = serviceAccountPath.startsWith(".")
-            ? require("path").resolve(__dirname, serviceAccountPath)
-            : serviceAccountPath;
-
-        const serviceAccount = require(resolvedPath);
-        firebaseApp = admin.initializeApp({
+        const serviceAccount = require(serviceAccountPath);
+        admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
         });
         console.log("Firebase Admin initialized successfully.");
-    } else {
-        console.warn("Firebase Admin NOT initialized: Missing credentials.");
+    } catch (error) {
+        console.error("Firebase Admin initialization failed:", error);
+        // We throw the error so the server doesn't start or we catch it in the caller
+        // But for now, let's keep it logged as it's better for debug.
     }
-} catch (error) {
-    console.error("Firebase Admin initialization failed:", error);
 }
 
 module.exports = admin;

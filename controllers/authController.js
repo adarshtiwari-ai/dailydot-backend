@@ -1,4 +1,7 @@
 const admin = require('../config/firebase');
+const jwt = require('jsonwebtoken');
+const bcryptjs = require('bcryptjs');
+const User = require('../models/User');
 
 // Helper to generate tokens
 const generateTokens = (user) => {

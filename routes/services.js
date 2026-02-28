@@ -3,6 +3,8 @@ const { body, validationResult } = require("express-validator");
 const Service = require("../models/Service");
 const { auth, adminAuth } = require("../middleware/auth");
 const upload = require("../middleware/upload");
+const cloudinary = require("../config/cloudinary");
+const fs = require("fs");
 
 const router = express.Router();
 
@@ -284,7 +286,23 @@ router.post(
 
       // Handle image upload
       if (req.files && req.files.length > 0) {
-        req.body.images = req.files.map(file => `/uploads/${file.filename.replace(/\\/g, "/")}`);
+        try {
+          const uploadedUrls = await Promise.all(
+            req.files.map(async (file) => {
+              const result = await cloudinary.uploader.upload(file.path, {
+                folder: "services",
+              });
+              fs.unlinkSync(file.path);
+              return result.secure_url;
+            })
+          );
+          req.body.images = uploadedUrls;
+          if (uploadedUrls.length > 0) {
+            req.body.imageUrl = uploadedUrls[0]; // Set first image as primary imageUrl
+          }
+        } catch (uploadError) {
+          console.error("Cloudinary upload error (services):", uploadError);
+        }
       }
 
       const service = await Service.create(req.body);
@@ -339,7 +357,23 @@ router.put("/:id", [auth, adminAuth, upload.array("images", 5)], async (req, res
   try {
     // Handle image upload
     if (req.files && req.files.length > 0) {
-      req.body.images = req.files.map(file => `/uploads/${file.filename.replace(/\\/g, "/")}`);
+      try {
+        const uploadedUrls = await Promise.all(
+          req.files.map(async (file) => {
+            const result = await cloudinary.uploader.upload(file.path, {
+              folder: "services",
+            });
+            fs.unlinkSync(file.path);
+            return result.secure_url;
+          })
+        );
+        req.body.images = uploadedUrls;
+        if (uploadedUrls.length > 0) {
+          req.body.imageUrl = uploadedUrls[0];
+        }
+      } catch (uploadError) {
+        console.error("Cloudinary upload error (update services):", uploadError);
+      }
     }
 
     const service = await Service.findByIdAndUpdate(req.params.id, req.body, {

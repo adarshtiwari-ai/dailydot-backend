@@ -1,19 +1,37 @@
 const admin = require("firebase-admin");
 const path = require("path");
+const fs = require("fs");
 
 if (!admin.apps.length) {
     try {
-        const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || path.join(__dirname, "..", "firebase-service-account.json");
+        // Dynamically resolve the path to firebase-service-account.json
+        // Render usually puts secrets in the root or a specified path; user specifies src/
+        const serviceAccountPath = path.join(process.cwd(), "src", "firebase-service-account.json");
 
-        const serviceAccount = require(serviceAccountPath);
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-        });
+        if (!fs.existsSync(serviceAccountPath)) {
+            // Check root as fallback for local development
+            const rootPath = path.join(process.cwd(), "firebase-service-account.json");
+
+            if (!fs.existsSync(rootPath)) {
+                console.error("🔥 ERROR: firebase-service-account.json is missing! Please check Render Secret Files configuration.");
+                process.exit(1); // Exit if critical for boot
+            }
+
+            const serviceAccount = JSON.parse(fs.readFileSync(rootPath, "utf8"));
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount),
+            });
+        } else {
+            const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount),
+            });
+        }
+
         console.log("Firebase Admin initialized successfully.");
     } catch (error) {
-        console.error("Firebase Admin initialization failed:", error);
-        // We throw the error so the server doesn't start or we catch it in the caller
-        // But for now, let's keep it logged as it's better for debug.
+        console.error("🔥 ERROR: firebase-service-account.json is missing! Please check Render Secret Files configuration.");
+        console.error("Details:", error.message);
     }
 }
 

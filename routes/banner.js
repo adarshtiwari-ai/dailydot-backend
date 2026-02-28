@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Banner = require('../models/Banner');
 const upload = require('../middleware/upload');
+const cloudinary = require('../config/cloudinary');
+const fs = require('fs');
 
 // Get all active banners (filtered by placement)
 router.get('/', async (req, res) => {
@@ -42,7 +44,15 @@ router.post('/', upload.single("image"), async (req, res) => {
     try {
         // Handle image upload
         if (req.file) {
-            req.body.image = `/uploads/${req.file.filename.replace(/\\/g, "/")}`;
+            try {
+                const result = await cloudinary.uploader.upload(req.file.path, {
+                    folder: "banners",
+                });
+                req.body.image = result.secure_url;
+                fs.unlinkSync(req.file.path);
+            } catch (error) {
+                console.error("Cloudinary upload error (banner):", error);
+            }
         }
 
         const banner = new Banner(req.body);
@@ -58,7 +68,15 @@ router.put('/:id', upload.single("image"), async (req, res) => {
     try {
         // Handle image upload
         if (req.file) {
-            req.body.image = `/uploads/${req.file.filename.replace(/\\/g, "/")}`;
+            try {
+                const result = await cloudinary.uploader.upload(req.file.path, {
+                    folder: "banners",
+                });
+                req.body.image = result.secure_url;
+                fs.unlinkSync(req.file.path);
+            } catch (error) {
+                console.error("Cloudinary upload error (update banner):", error);
+            }
         }
 
         const banner = await Banner.findByIdAndUpdate(req.params.id, req.body, { new: true });

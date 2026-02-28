@@ -3,6 +3,8 @@ const { body, validationResult } = require("express-validator");
 const Category = require("../models/Category");
 const { auth, adminAuth } = require("../middleware/auth");
 const upload = require("../middleware/upload");
+const cloudinary = require("../config/cloudinary");
+const fs = require("fs");
 
 const router = express.Router();
 
@@ -156,8 +158,17 @@ router.post(
       // Handle Image Upload
       let imageUrl = req.body.image || "";
       if (req.files && req.files.image && req.files.image[0]) {
-        // Replace backslashes with forward slashes for URL compatibility
-        imageUrl = `/uploads/${req.files.image[0].filename.replace(/\\/g, "/")}`;
+        try {
+          const result = await cloudinary.uploader.upload(req.files.image[0].path, {
+            folder: "categories",
+          });
+          imageUrl = result.secure_url;
+          // Delete local file after upload
+          fs.unlinkSync(req.files.image[0].path);
+        } catch (uploadError) {
+          console.error("Cloudinary upload error (image):", uploadError);
+          // Fallback to local path if Cloudinary fails, or handle error
+        }
       }
 
       // Handle tags (if sent as stringified JSON from FormData)
@@ -179,16 +190,24 @@ router.post(
         const tagIcons = req.files.tagIcons;
 
         // Map uploaded files to tags
-        tags = tags.map(tag => {
+        tags = await Promise.all(tags.map(async (tag) => {
           if (tag.icon && tag.icon.startsWith("TAG_FILE_INDEX_")) {
             const indexIndex = parseInt(tag.icon.replace("TAG_FILE_INDEX_", ""), 10);
             if (!isNaN(indexIndex) && tagIcons[indexIndex]) {
-              // Replace backslashes with forward slashes for URL compatibility
-              return { ...tag, icon: `/uploads/${tagIcons[indexIndex].filename.replace(/\\/g, "/")}` };
+              try {
+                const result = await cloudinary.uploader.upload(tagIcons[indexIndex].path, {
+                  folder: "category_tags",
+                });
+                // Delete local file
+                fs.unlinkSync(tagIcons[indexIndex].path);
+                return { ...tag, icon: result.secure_url };
+              } catch (tagIconError) {
+                console.error("Cloudinary upload error (tagIcon):", tagIconError);
+              }
             }
           }
           return tag;
-        });
+        }));
       }
 
       category = await Category.create({
@@ -196,6 +215,7 @@ router.post(
         slug,
         description,
         image: imageUrl,
+        imageUrl: imageUrl, // Ensure both are set
         sortOrder: sortOrder || 0,
         isActive: isActive === "true" || isActive === true,
         tags: tags,
@@ -274,7 +294,17 @@ router.put("/:id",
 
       // Handle Image Upload
       if (req.files && req.files.image && req.files.image[0]) {
-        fieldsToUpdate.image = `/uploads/${req.files.image[0].filename.replace(/\\/g, "/")}`;
+        try {
+          const result = await cloudinary.uploader.upload(req.files.image[0].path, {
+            folder: "categories",
+          });
+          fieldsToUpdate.image = result.secure_url;
+          fieldsToUpdate.imageUrl = result.secure_url; // Ensure both are updated
+          // Delete local file
+          fs.unlinkSync(req.files.image[0].path);
+        } catch (uploadError) {
+          console.error("Cloudinary upload error (update image):", uploadError);
+        }
       }
 
       // Handle tags parsing
@@ -293,15 +323,24 @@ router.put("/:id",
         const tagIcons = req.files.tagIcons;
 
         // Map uploaded files to tags
-        fieldsToUpdate.tags = fieldsToUpdate.tags.map(tag => {
+        fieldsToUpdate.tags = await Promise.all(fieldsToUpdate.tags.map(async (tag) => {
           if (tag.icon && tag.icon.startsWith("TAG_FILE_INDEX_")) {
             const indexIndex = parseInt(tag.icon.replace("TAG_FILE_INDEX_", ""), 10);
             if (!isNaN(indexIndex) && tagIcons[indexIndex]) {
-              return { ...tag, icon: `/uploads/${tagIcons[indexIndex].filename.replace(/\\/g, "/")}` };
+              try {
+                const result = await cloudinary.uploader.upload(tagIcons[indexIndex].path, {
+                  folder: "category_tags",
+                });
+                // Delete local file
+                fs.unlinkSync(tagIcons[indexIndex].path);
+                return { ...tag, icon: result.secure_url };
+              } catch (tagIconError) {
+                console.error("Cloudinary upload error (update tagIcon):", tagIconError);
+              }
             }
           }
           return tag;
-        });
+        }));
       }
 
       category = await Category.findByIdAndUpdate(req.params.id, fieldsToUpdate, {

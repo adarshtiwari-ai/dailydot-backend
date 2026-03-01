@@ -24,7 +24,7 @@ const emailTemplates = {
   welcome: (user) => ({
     subject: "Welcome to DailyDot!",
     html: `
-      <h2>Welcome ${user.name}!</h2>
+      <h2>Welcome ${user?.name || 'User'}!</h2>
       <p>Thank you for joining DailyDot. We're excited to have you on board.</p>
       <p>You can now book home services easily through our platform.</p>
       <br>
@@ -36,14 +36,14 @@ const emailTemplates = {
     subject: `Booking Confirmed - ${booking.bookingNumber}`,
     html: `
       <h2>Booking Confirmation</h2>
-      <p>Hi ${user.name},</p>
+      <p>Hi ${user?.name || 'User'},</p>
       <p>Your booking has been confirmed!</p>
       <div style="border: 1px solid #ddd; padding: 15px; margin: 15px 0;">
         <p><strong>Booking Number:</strong> ${booking.bookingNumber}</p>
-        <p><strong>Service:</strong> ${booking.serviceId.name}</p>
+        <p><strong>Service:</strong> ${booking.items?.[0]?.name || 'Home Service'}</p>
         <p><strong>Date:</strong> ${new Date(
-          booking.scheduledDate
-        ).toLocaleDateString()}</p>
+      booking.scheduledDate
+    ).toLocaleDateString()}</p>
         <p><strong>Status:</strong> ${booking.status}</p>
         <p><strong>Amount:</strong> ₹${booking.totalAmount}</p>
       </div>
@@ -55,7 +55,7 @@ const emailTemplates = {
     subject: `Payment Successful - ₹${booking.totalAmount}`,
     html: `
       <h2>Payment Confirmation</h2>
-      <p>Hi ${user.name},</p>
+      <p>Hi ${user?.name || 'User'},</p>
       <p>We've received your payment of <strong>₹${booking.totalAmount}</strong></p>
       <p>Booking Number: ${booking.bookingNumber}</p>
       <p>Payment ID: ${booking.paymentId}</p>
@@ -68,7 +68,7 @@ const emailTemplates = {
     subject: `Booking ${booking.status} - ${booking.bookingNumber}`,
     html: `
       <h2>Booking Status Update</h2>
-      <p>Hi ${user.name},</p>
+      <p>Hi ${user?.name || 'User'},</p>
       <p>Your booking ${booking.bookingNumber} status has been updated to: <strong>${booking.status}</strong></p>
       <p>If you have any questions, please contact our support team.</p>
     `,

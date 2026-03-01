@@ -46,7 +46,8 @@ const userSchema = new mongoose.Schema({
   },
   pushToken: {
     type: String,
-    default: ''
+    default: '',
+    index: true // Added index for faster lookups
   },
   role: {
     type: String,

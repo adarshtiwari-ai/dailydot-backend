@@ -17,57 +17,76 @@ class NotificationService {
 
   // Send both email and SMS and Push
   async sendNotification(type, data) {
-    const { user, booking, message } = data;
+    const { user, booking } = data;
+
+    // Robust data extraction with fallbacks
+    const name = user?.name || booking?.name || "Customer";
+    const phone = user?.phone || booking?.phone;
+    const email = user?.email || booking?.email;
+    const userId = user?._id || booking?.userId;
+
+    const safeUser = { ...user, name, phone, email, _id: userId };
     const results = {};
 
-    // Send Email
     try {
       switch (type) {
         case "welcome":
-          results.email = await emailService.sendWelcomeEmail(user);
+          results.email = await emailService.sendWelcomeEmail(safeUser);
           break;
         case "booking_confirmation":
           results.email = await emailService.sendBookingConfirmation(
             booking,
-            user
+            safeUser
           );
-          results.sms = await smsService.sendBookingConfirmation(
-            user.phone,
-            booking.bookingNumber
-          );
-          results.push = await this.sendPushNotification(
-            user._id,
-            "Booking Confirmed! ✅",
-            `Your booking #${booking.bookingNumber} has been confirmed.`,
-            { bookingId: booking._id.toString(), type: "booking_confirmation" }
-          );
+          if (phone) {
+            results.sms = await smsService.sendBookingConfirmation(
+              phone,
+              booking.bookingNumber
+            );
+          }
+          if (userId) {
+            results.push = await this.sendPushNotification(
+              userId,
+              "Booking Confirmed! ✅",
+              `Your booking #${booking.bookingNumber} has been confirmed.`,
+              { bookingId: booking._id.toString(), type: "booking_confirmation" }
+            );
+          }
           break;
         case "payment_success":
-          results.email = await emailService.sendPaymentSuccess(booking, user);
-          results.sms = await smsService.sendPaymentSuccess(
-            user.phone,
-            booking.totalAmount
-          );
-          results.push = await this.sendPushNotification(
-            user._id,
-            "Payment Successful! 💰",
-            `We received your payment of ₹${booking.totalAmount}.`,
-            { bookingId: booking._id.toString(), type: "payment_success" }
-          );
+          results.email = await emailService.sendPaymentSuccess(booking, safeUser);
+          if (phone) {
+            results.sms = await smsService.sendPaymentSuccess(
+              phone,
+              booking.totalAmount
+            );
+          }
+          if (userId) {
+            results.push = await this.sendPushNotification(
+              userId,
+              "Payment Successful! 💰",
+              `We received your payment of ₹${booking.totalAmount}.`,
+              { bookingId: booking._id.toString(), type: "payment_success" }
+            );
+          }
           break;
         case "status_update":
-          results.email = await emailService.sendStatusUpdate(booking, user);
-          results.sms = await smsService.sendStatusUpdate(
-            user.phone,
-            booking.bookingNumber,
-            booking.status
-          );
-          results.push = await this.sendPushNotification(
-            user._id,
-            `Booking Status: ${booking.status.toUpperCase()}`,
-            `Your booking #${booking.bookingNumber} is now ${booking.status}.`,
-            { bookingId: booking._id.toString(), type: "status_update" }
-          );
+          results.email = await emailService.sendStatusUpdate(booking, safeUser);
+          if (phone) {
+            results.sms = await smsService.sendStatusUpdate(
+              phone,
+              booking.bookingNumber,
+              booking.status
+            );
+          }
+          if (userId) {
+            results.push = await this.sendPushNotification(
+              userId,
+              `Booking Status: ${booking.status.toUpperCase()}`,
+              `Your booking #${booking.bookingNumber} is now ${booking.status}.`,
+              { bookingId: booking._id.toString(), type: "status_update" }
+            );
+          }
           break;
       }
     } catch (error) {

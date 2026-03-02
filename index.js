@@ -7,6 +7,7 @@ const helmet = require("helmet");
 const http = require("http");
 const connectDB = require("./config/database");
 const { init } = require("./services/socket.service");
+require("./services/event.service");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./config/swagger");
 

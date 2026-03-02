@@ -3,8 +3,7 @@ const Booking = require("../models/Booking");
 const Professional = require("../models/Professional");
 const Service = require("../models/Service");
 const { validationResult } = require("express-validator");
-const { sendPushNotification } = require("../utils/pushService");
-const notificationService = require("../services/notification.service");
+const eventHub = require("../services/event.service");
 
 // @desc    Create a new booking
 // @route   POST /api/v1/bookings
@@ -80,14 +79,11 @@ exports.createBooking = async (req, res) => {
             .populate("items.serviceId", "name price duration")
             .populate("userId", "name email phone");
 
-        // Send Notification (Background)
-        notificationService
-            .sendNotification("booking_confirmation", {
-                booking: populatedBooking,
-                user: populatedBooking.userId,
-            })
-            .then(() => console.log("Booking confirmation sent"))
-            .catch((err) => console.error("Notification error:", err));
+        // Emit BOOKING_CREATED event
+        eventHub.emit("BOOKING_CREATED", {
+            booking: populatedBooking,
+            user: populatedBooking.userId,
+        });
 
         res.status(201).json({
             success: true,
@@ -219,26 +215,11 @@ exports.updateBookingStatus = async (req, res) => {
             booking,
         });
 
-        // Trigger Push Notifications based on status (Background)
-        if (status === "confirmed") {
-            sendPushNotification(
-                booking.userId,
-                "Booking Confirmed! 🎉",
-                "Your professional has been assigned and is on the way.",
-                { screen: "History", bookingId: booking._id.toString() }
-            ).catch((notifyError) =>
-                console.error("Non-blocking notification error:", notifyError)
-            );
-        } else if (status === "completed") {
-            sendPushNotification(
-                booking.userId,
-                "Service Complete ✅",
-                "Please tap here to rate your professional and view your receipt.",
-                { screen: "History", bookingId: booking._id.toString() }
-            ).catch((notifyError) =>
-                console.error("Non-blocking notification error:", notifyError)
-            );
-        }
+        // Emit BOOKING_STATUS_UPDATED event
+        eventHub.emit("BOOKING_STATUS_UPDATED", {
+            booking,
+            status,
+        });
     } catch (error) {
         console.error("Update Status Error:", error);
         res.status(500).json({
@@ -281,18 +262,11 @@ exports.assignWorker = async (req, res) => {
         booking.generateOtp();
         await booking.save();
 
-        // Notify User
-        try {
-            await booking.populate("userId");
-            notificationService.sendPushNotification(
-                booking.userId._id,
-                "Worker Assigned 👷",
-                `${req.user.name} has been assigned to your booking!`,
-                { bookingId: booking._id.toString(), type: "worker_assigned" }
-            );
-        } catch (err) {
-            console.error("Notification error:", err);
-        }
+        // Emit WORKER_ASSIGNED event
+        eventHub.emit("WORKER_ASSIGNED", {
+            booking,
+            workerName: req.user.name,
+        });
 
         res.json({ success: true, message: "Worker assigned", booking });
     } catch (error) {
@@ -413,18 +387,11 @@ exports.confirmCod = async (req, res) => {
         booking.paymentStatus = "pending";
         await booking.save();
 
-        // Send notification
-        try {
-            await booking.populate("userId", "name email phone");
-            notificationService
-                .sendNotification("booking_confirmation", {
-                    booking,
-                    user: booking.userId,
-                })
-                .catch((err) => console.error("Notification error:", err));
-        } catch (error) {
-            console.error("Notification service error:", error);
-        }
+        // Emit BOOKING_CREATED event for COD confirmation
+        eventHub.emit("BOOKING_CREATED", {
+            booking,
+            user: booking.userId,
+        });
 
         res.json({
             success: true,

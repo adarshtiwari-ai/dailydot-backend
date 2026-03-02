@@ -1,4 +1,20 @@
 require("dotenv").config();
+
+// Environment Variable Validation
+const requiredEnvVars = [
+  "OLA_MAPS_API_KEY",
+  "GOOGLE_MAPS_API_KEY",
+  "MONGODB_URI",
+  "JWT_SECRET"
+];
+
+requiredEnvVars.forEach((varName) => {
+  if (!process.env[varName] || process.env[varName].includes("your_")) {
+    console.error(`❌ CRITICAL ERROR: Environment variable ${varName} is missing or has a placeholder value!`);
+    process.exit(1);
+  }
+});
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");

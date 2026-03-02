@@ -59,12 +59,6 @@ const bookingSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    // Worker Details
-    workerId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null
-    },
     // New Professional Reference
     assignedPro: {
       type: mongoose.Schema.Types.ObjectId,

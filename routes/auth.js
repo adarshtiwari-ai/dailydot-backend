@@ -12,6 +12,10 @@ router.post('/firebase-login', authController.firebaseLogin);
 // @route   POST /api/v1/auth/social-login
 router.post('/social-login', authController.socialLogin);
 
+// --- Device Auth Routes (Mobile/Testing) ---
+router.post('/device-login', authController.deviceLogin);
+router.post('/register-device', authController.registerDevice);
+
 // @route   PUT /api/v1/auth/update-profile
 router.put('/update-profile', auth, authController.updateProfile);
 

@@ -341,4 +341,54 @@ exports.updateProfile = async (req, res) => {
     }
 };
 
+// @desc    Device Login (Guest/Identity check)
+// @route   POST /api/v1/auth/device-login
+// @access  Public
+exports.deviceLogin = async (req, res) => {
+    try {
+        const { deviceId } = req.body;
+        if (!deviceId) return res.status(400).json({ success: false, message: 'Device ID required' });
+
+        const user = await User.findOne({ deviceId });
+        if (!user) {
+            return res.json({ success: true, isGuest: true, message: 'New device' });
+        }
+
+        const { accessToken, refreshToken } = generateTokens(user);
+        res.json({
+            success: true,
+            isGuest: false,
+            accessToken,
+            refreshToken,
+            user
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Device login failed' });
+    }
+};
+
+// @desc    Register Device (Associate device with phone/user)
+// @route   POST /api/v1/auth/register-device
+// @access  Public
+exports.registerDevice = async (req, res) => {
+    try {
+        const { name, phone, deviceId, address } = req.body;
+        if (!phone || !deviceId) return res.status(400).json({ success: false, message: 'Phone and Device ID required' });
+
+        let user = await User.findOne({ phone });
+        if (user) {
+            user.deviceId = deviceId;
+            if (name) user.name = name;
+            await user.save();
+        } else {
+            user = await User.create({ name, phone, deviceId, address, isVerified: true });
+        }
+
+        const { accessToken, refreshToken } = generateTokens(user);
+        res.status(201).json({ success: true, accessToken, refreshToken, user });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Device registration failed', error: error.message });
+    }
+};
+
 module.exports = exports;

@@ -1,11 +1,10 @@
 const express = require("express");
-const { body, validationResult } = require("express-validator");
-const Booking = require("../models/Booking");
-const Service = require("../models/Service");
+const { body } = require("express-validator");
 const { auth, adminAuth } = require("../middleware/auth");
-const { sendPushNotification } = require("../utils/pushService");
+const bookingController = require("../controllers/bookingController");
 
 const router = express.Router();
+
 /**
  * @swagger
  * /api/v1/bookings:
@@ -27,11 +26,9 @@ const router = express.Router();
  *             properties:
  *               serviceId:
  *                 type: string
- *                 example: 507f1f77bcf86cd799439011
  *               scheduledDate:
  *                 type: string
  *                 format: date-time
- *                 example: 2024-12-25T10:00:00Z
  *               serviceAddress:
  *                 type: object
  *                 properties:
@@ -46,9 +43,23 @@ const router = express.Router();
  *     responses:
  *       201:
  *         description: Booking created successfully
- *       401:
- *         description: Unauthorized
  */
+router.post(
+  "/",
+  auth,
+  [
+    body("items").isArray({ min: 1 }).withMessage("At least one item is required"),
+    body("items.*.serviceId").notEmpty().withMessage("Service ID is required"),
+    body("scheduledDate").isISO8601().withMessage("Valid date is required"),
+    body("scheduledTime").notEmpty().withMessage("Time slot is required"),
+    body("serviceAddress.addressLine1").notEmpty().withMessage("Address is required"),
+    body("serviceAddress.city").notEmpty().withMessage("City is required"),
+    body("serviceAddress.pincode").notEmpty().withMessage("Pincode is required"),
+    body("name").optional().isString(),
+    body("phone").optional().isString(),
+  ],
+  bookingController.createBooking
+);
 
 /**
  * @swagger
@@ -61,9 +72,8 @@ const router = express.Router();
  *     responses:
  *       200:
  *         description: List of user's bookings
- *       401:
- *         description: Unauthorized
  */
+router.get("/my-bookings", auth, bookingController.getMyBookings);
 
 /**
  * @swagger
@@ -77,35 +87,12 @@ const router = express.Router();
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: string
  *     responses:
  *       200:
  *         description: Booking details
- *       404:
- *         description: Booking not found
  */
+router.get("/:id", auth, bookingController.getBookingById);
 
-/**
- * @swagger
- * /api/v1/bookings/{id}/cancel:
- *   patch:
- *     summary: Cancel booking
- *     tags: [Bookings]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Booking cancelled successfully
- *       400:
- *         description: Booking cannot be cancelled
- */
 /**
  * @swagger
  * /api/v1/bookings/{id}/status:
@@ -114,13 +101,6 @@ const router = express.Router();
  *     tags: [Bookings]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Booking ID
  *     requestBody:
  *       required: true
  *       content:
@@ -133,192 +113,7 @@ const router = express.Router();
  *               status:
  *                 type: string
  *                 enum: [pending, confirmed, completed, cancelled]
- *                 example: confirmed
- *     responses:
- *       200:
- *         description: Booking status updated successfully
- *       400:
- *         description: Invalid status
- *       404:
- *         description: Booking not found
- *       403:
- *         description: Admin access required
  */
-/**
- * @swagger
- * /api/v1/bookings:
- *   get:
- *     summary: Get all bookings (Admin only)
- *     tags: [Bookings]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of all bookings
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Admin access required
- */
-// Keep your existing router code below
-
-// Create booking (authenticated users)
-router.post(
-  "/",
-  auth,
-  [
-    body("items").isArray({ min: 1 }).withMessage("At least one item is required"),
-    body("items.*.serviceId").notEmpty().withMessage("Service ID is required for each item"),
-    body("items.*.price").isNumeric().withMessage("Price is required for each item"),
-    body("scheduledDate").isISO8601().withMessage("Valid date is required"),
-    body("scheduledTime").notEmpty().withMessage("Time slot is required"),
-    body("serviceAddress.addressLine1")
-      .notEmpty()
-      .withMessage("Address is required"),
-    body("serviceAddress.city").notEmpty().withMessage("City is required"),
-    body("serviceAddress.pincode")
-      .notEmpty()
-      .withMessage("Pincode is required"),
-    body("name").optional().isString(),
-    body("phone").optional().isString(),
-  ],
-  async (req, res) => {
-    console.log('--- NEW BOOKING REQUEST RECEIVED ---');
-    console.log('Body:', req.body);
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          errors: errors.array(),
-        });
-      }
-
-      // ✅ ADD THIS LINE - Extract from request body
-      const { items, scheduledDate, scheduledTime, serviceAddress, notes, name, phone } = req.body;
-
-      // Calculate total amount from items
-      const totalAmount = items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
-
-      // Verify services exist (Optional but good practice)
-      // const serviceIds = items.map(item => item.serviceId);
-      // const foundServices = await Service.find({ _id: { $in: serviceIds } });
-      // if (foundServices.length !== serviceIds.length) { ... }
-
-      // Generate booking number
-      const date = new Date();
-      const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const bookingNumber = `BK${date.getFullYear()}${random}`;
-
-      // Create booking - Now all variables are defined
-      const booking = await Booking.create({
-        userId: req.user._id,
-        items, // Store the array of items
-        bookingNumber,
-        scheduledDate,
-        scheduledTime,
-        serviceAddress,
-        totalAmount, // Calculated sum
-        name: name || req.user.name, // Fallback to user profile if not provided
-        phone: phone || req.user.phone, // Fallback to user profile
-        notes,
-        paymentMethod: "cod", // Force COD for now
-        paymentStatus: "pending"
-      });
-      // Populate the booking with service details
-      const populatedBooking = await Booking.findById(booking._id)
-        .populate("items.serviceId", "name price duration")
-        .populate("userId", "name email phone");
-
-      // ADD NOTIFICATION HERE (after booking creation, before response)
-      try {
-        const notificationService = require("../services/notification.service");
-        notificationService
-          .sendNotification("booking_confirmation", {
-            booking: populatedBooking,
-            user: populatedBooking.userId,
-          })
-          .then(() => console.log("Booking confirmation sent"))
-          .catch((err) => console.error("Notification error:", err));
-      } catch (error) {
-        console.error("Notification service error:", error);
-      }
-
-      res.status(201).json({
-        success: true,
-        message: "Booking created successfully",
-        booking: populatedBooking,
-      });
-    } catch (error) {
-      console.error('CRITICAL BOOKING ERROR:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Server Error',
-        error: error.message
-      });
-    }
-  }
-);
-// Get user's bookings
-router.get("/my-bookings", auth, async (req, res) => {
-  try {
-    const bookings = await Booking.find({ userId: req.user._id })
-      .populate("items.serviceId", "name price duration")
-      .populate("assignedPro", "name phone averageRating totalRatings") // Populate pro details
-      .sort({ createdAt: -1 });
-
-    res.json({
-      success: true,
-      count: bookings.length,
-      bookings,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch bookings",
-    });
-  }
-});
-
-// Get single booking
-router.get("/:id", auth, async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id)
-      .populate("items.serviceId", "name price duration")
-      .populate("userId", "name email phone")
-      .populate("assignedPro", "name phone averageRating totalRatings"); // Populate pro details
-
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: "Booking not found",
-      });
-    }
-
-    // Check if user owns this booking or is admin
-    if (
-      booking.userId._id.toString() !== req.user._id.toString() &&
-      req.user.role !== "admin"
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
-    res.json({
-      success: true,
-      booking,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch booking",
-    });
-  }
-});
-
-// Update booking status (admin only)
 router.patch(
   "/:id/status",
   [auth, adminAuth],
@@ -326,375 +121,73 @@ router.patch(
     body("status")
       .isIn(["pending", "confirmed", "completed", "cancelled"])
       .withMessage("Invalid status"),
-    // Optional fields for assigning pro
     body("proName").optional().isString(),
     body("proPhone").optional().isString(),
   ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          errors: errors.array(),
-        });
-      }
-
-      const { status, proName, proPhone } = req.body;
-      let assignedProId = null;
-
-      // Logic for Assigning Professional on Confirmation
-      if (status === 'confirmed' && proName && proPhone) {
-        const Professional = require('../models/Professional');
-
-        // Find existing pro by phone
-        let pro = await Professional.findOne({ phone: proPhone });
-
-        if (!pro) {
-          // Create new pro
-          pro = await Professional.create({
-            name: proName,
-            phone: proPhone
-          });
-          console.log(`New Professional Created: ${pro.name}`);
-        }
-
-        assignedProId = pro._id;
-      }
-
-      const updateData = { status };
-      if (assignedProId) {
-        updateData.assignedPro = assignedProId;
-      }
-
-      const booking = await Booking.findByIdAndUpdate(
-        req.params.id,
-        updateData,
-        { new: true }
-      ).populate('assignedPro'); // Populate to return the pro details
-
-      if (!booking) {
-        return res.status(404).json({
-          success: false,
-          message: "Booking not found",
-        });
-      }
-
-      res.json({
-        success: true,
-        message: "Booking status updated successfully",
-        booking,
-      });
-
-      // Trigger Push Notifications based on status
-      try {
-        if (status === 'confirmed') {
-          await sendPushNotification(
-            booking.userId,
-            'Booking Confirmed! 🎉',
-            'Your professional has been assigned and is on the way.',
-            { screen: 'History', bookingId: booking._id.toString() }
-          );
-        } else if (status === 'completed') {
-          await sendPushNotification(
-            booking.userId,
-            'Service Complete ✅',
-            'Please tap here to rate your professional and view your receipt.',
-            { screen: 'History', bookingId: booking._id.toString() }
-          );
-        }
-      } catch (notifyError) {
-        console.error("Non-blocking notification error:", notifyError);
-      }
-    } catch (error) {
-      console.error("Update Status Error:", error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to update booking",
-      });
-    }
-  }
+  bookingController.updateBookingStatus
 );
 
-// Assign Worker (Simulation)
-router.patch(
-  "/:id/assign-worker",
-  auth,
-  async (req, res) => {
-    try {
-      // In a real app, this would be admin only or matching algorithm
-      const booking = await Booking.findById(req.params.id);
-      if (!booking) {
-        return res.status(404).json({ success: false, message: "Booking not found" });
-      }
+/**
+ * @swagger
+ * /api/v1/bookings/{id}/assign-worker:
+ *   patch:
+ *     summary: Assign worker (Simulation)
+ *     tags: [Bookings]
+ */
+router.patch("/:id/assign-worker", auth, bookingController.assignWorker);
 
-      booking.status = "assigned";
-      booking.workerId = req.user._id; // Assigning current user as worker for testing
-      booking.generateOtp();
-      await booking.save();
+/**
+ * @swagger
+ * /api/v1/bookings/{id}/update-location:
+ *   patch:
+ *     summary: Update worker location
+ *     tags: [Bookings]
+ */
+router.patch("/:id/update-location", auth, bookingController.updateLocation);
 
-      // Notify User
-      try {
-        const notificationService = require("../services/notification.service");
-        await booking.populate("userId");
-        notificationService.sendPushNotification(
-          booking.userId._id,
-          "Worker Assigned 👷",
-          `${req.user.name} has been assigned to your booking!`,
-          { bookingId: booking._id.toString(), type: "worker_assigned" }
-        );
-      } catch (err) {
-        console.error("Notification error:", err);
-      }
+/**
+ * @swagger
+ * /api/v1/bookings/{id}/cancel:
+ *   patch:
+ *     summary: Cancel booking
+ *     tags: [Bookings]
+ */
+router.patch("/:id/cancel", auth, bookingController.cancelBooking);
 
-      res.json({ success: true, message: "Worker assigned", booking });
-    } catch (error) {
-      res.status(500).json({ success: false, message: "Failed to assign worker" });
-    }
-  }
-);
+/**
+ * @swagger
+ * /api/v1/bookings/{id}/confirm-cod:
+ *   post:
+ *     summary: Confirm COD booking
+ *     tags: [Bookings]
+ */
+router.post("/:id/confirm-cod", auth, bookingController.confirmCod);
 
-// Update Location
-router.patch(
-  "/:id/update-location",
-  auth,
-  async (req, res) => {
-    try {
-      const { lat, lng } = req.body;
-      const booking = await Booking.findByIdAndUpdate(
-        req.params.id,
-        {
-          workerLocation: { lat, lng, lastUpdated: new Date() },
-          status: "on_the_way"
-        },
-        { new: true }
-      );
-
-      // Emit socket event
-      const { getIo } = require("../services/socket.service");
-      try {
-        getIo().to(req.params.id).emit("location_update", { lat, lng });
-      } catch (err) {
-        console.log("Socket emit failed", err.message);
-      }
-
-      res.json({ success: true, location: { lat, lng } });
-    } catch (error) {
-      res.status(500).json({ success: false, message: "Failed to update location" });
-    }
-  }
-);
-
-// Cancel booking
-router.patch("/:id/cancel", auth, async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id);
-
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: "Booking not found",
-      });
-    }
-
-    // Check if user owns this booking
-    if (booking.userId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
-    // Check if booking can be cancelled
-    if (booking.status !== "pending" && booking.status !== "confirmed") {
-      return res.status(400).json({
-        success: false,
-        message: "Booking cannot be cancelled",
-      });
-    }
-
-    booking.status = "cancelled";
-    await booking.save();
-
-    res.json({
-      success: true,
-      message: "Booking cancelled successfully",
-      booking,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to cancel booking",
-    });
-  }
-});
-
-// Confirm COD booking
-router.post("/:id/confirm-cod", auth, async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id);
-
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: "Booking not found",
-      });
-    }
-
-    // Check if user owns this booking
-    if (booking.userId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
-    // Check if booking can be confirmed
-    if (booking.status !== "pending") {
-      return res.status(400).json({
-        success: false,
-        message: "Booking is not in pending state",
-      });
-    }
-
-    booking.status = "confirmed";
-    booking.paymentMethod = "cod";
-    booking.paymentStatus = "pending";
-    await booking.save();
-
-    // Send notification
-    try {
-      const notificationService = require("../services/notification.service");
-      await booking.populate("userId", "name email phone");
-      notificationService
-        .sendNotification("booking_confirmation", {
-          booking,
-          user: booking.userId,
-        })
-        .catch((err) => console.error("Notification error:", err));
-    } catch (error) {
-      console.error("Notification service error:", error);
-    }
-
-    res.json({
-      success: true,
-      message: "Booking confirmed with Cash on Delivery",
-      booking,
-    });
-  } catch (error) {
-    console.error("COD confirmation error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to confirm booking",
-    });
-  }
-});
-
-// Rate a booking
+/**
+ * @swagger
+ * /api/v1/bookings/{id}/rate:
+ *   patch:
+ *     summary: Rate a booking
+ *     tags: [Bookings]
+ */
 router.patch(
   "/:id/rate",
   auth,
   [
-    body("serviceRating").isInt({ min: 1, max: 5 }).withMessage("Service rating must be 1-5"),
-    body("proRating").isInt({ min: 1, max: 5 }).withMessage("Professional rating must be 1-5"),
-    body("comment").optional().isString()
+    body("serviceRating").isInt({ min: 1, max: 5 }).withMessage("Service rating 1-5"),
+    body("proRating").isInt({ min: 1, max: 5 }).withMessage("Pro rating 1-5"),
+    body("comment").optional().isString(),
   ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ success: false, errors: errors.array() });
-      }
-
-      const { serviceRating, proRating, comment } = req.body;
-      const booking = await Booking.findById(req.params.id);
-
-      if (!booking) {
-        return res.status(404).json({ success: false, message: "Booking not found" });
-      }
-
-      // Check ownership
-      if (booking.userId.toString() !== req.user._id.toString()) {
-        return res.status(403).json({ success: false, message: "Access denied" });
-      }
-
-      // Check if already rated
-      if (booking.isRated) {
-        return res.status(400).json({ success: false, message: "Booking already rated" });
-      }
-
-      // Update Booking
-      booking.serviceRating = serviceRating;
-      booking.proRating = proRating;
-      booking.comment = comment;
-      booking.isRated = true;
-      await booking.save();
-
-      // Update Service Average Rating
-      // We need to aggregate all ratings for this service
-      // Note: Booking items is an array, usually we rate the main service.
-      // For simplicity, we'll attribute the rating to the first service in the booking items.
-      if (booking.items && booking.items.length > 0) {
-        const serviceId = booking.items[0].serviceId;
-        const Service = require("../models/Service");
-
-        const service = await Service.findById(serviceId);
-        if (service) {
-          const newTotalRatings = (service.totalRatings || 0) + 1;
-          const currentTotalScore = (service.averageRating || 0) * (service.totalRatings || 0);
-          const newAverage = (currentTotalScore + serviceRating) / newTotalRatings;
-
-          service.totalRatings = newTotalRatings;
-          service.averageRating = newAverage;
-          await service.save();
-        }
-      }
-
-      // Update Professional Average Rating
-      if (booking.assignedPro) {
-        const Professional = require("../models/Professional");
-        const pro = await Professional.findById(booking.assignedPro);
-        if (pro) {
-          const newTotalRatings = (pro.totalRatings || 0) + 1;
-          const currentTotalScore = (pro.averageRating || 0) * (pro.totalRatings || 0);
-          const newAverage = (currentTotalScore + proRating) / newTotalRatings;
-
-          pro.totalRatings = newTotalRatings;
-          pro.averageRating = newAverage;
-          await pro.save();
-        }
-      }
-
-      res.json({ success: true, message: "Rating submitted successfully", booking });
-
-    } catch (error) {
-      console.error("Rating Error:", error);
-      res.status(500).json({ success: false, message: "Failed to submit rating" });
-    }
-  }
+  bookingController.rateBooking
 );
 
-router.get("/", [auth, adminAuth], async (req, res) => {
-  try {
-    const limit = parseInt(req.query.limit) || 0;
-    const bookings = await Booking.find()
-      .populate("items.serviceId", "name price")
-      .populate("userId", "name phone email")
-      .populate("assignedPro", "name phone averageRating totalRatings") // Populate pro details
-      .sort({ createdAt: -1 })
-      .limit(limit);
-
-    res.json({
-      success: true,
-      count: bookings.length,
-      bookings,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch bookings",
-    });
-  }
-});
+/**
+ * @swagger
+ * /api/v1/bookings:
+ *   get:
+ *     summary: Get all bookings (Admin only)
+ *     tags: [Bookings]
+ */
+router.get("/", [auth, adminAuth], bookingController.getAllBookings);
 
 module.exports = router;

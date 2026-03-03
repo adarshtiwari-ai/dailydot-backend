@@ -29,8 +29,8 @@ router.get("/", async (req, res) => {
 
     res.json({
       success: true,
-      count: categories.length,
-      categories,
+      count: (categories || []).length,
+      categories: categories ?? [],
     });
   } catch (error) {
     console.error("Get categories error:", error);

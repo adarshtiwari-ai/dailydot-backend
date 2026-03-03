@@ -1,5 +1,8 @@
 const express = require("express");
 const Setting = require("../models/Setting");
+const Banner = require("../models/Banner");
+const Category = require("../models/Category");
+const Service = require("../models/Service");
 const { auth, adminAuth } = require("../middleware/auth");
 
 const router = express.Router();
@@ -13,14 +16,39 @@ router.get("/app-config", async (req, res) => {
             settings = await Setting.create({});
         }
 
-        // Transform for mobile app consumption
+        // Fetch initial data for faster hydration
+        const [banners, categories, trending] = await Promise.all([
+            Banner.find({ isActive: true, placement: 'home' }).sort({ sortOrder: 1 }).limit(5),
+            Category.find({ isActive: true }).sort({ sortOrder: 1 }).limit(10),
+            Service.find({ isActive: true, isTopBooked: true }).populate('category').limit(6)
+        ]);
+
+        // Transform for mobile app consumption with robust defaults
         const config = {
-            theme: settings.theme,
-            navigation: settings.navigation,
-            layout: {
-                home: settings.homeLayout.sort((a, b) => a.order - b.order)
+            theme: {
+                primary: settings.theme?.primary || "#667eea",
+                secondary: settings.theme?.secondary || "#764ba2",
+                fontUrls: settings.theme?.fontUrls || []
             },
-            maintenance: settings.system.maintenanceMode
+            navigation: (settings.navigation && settings.navigation.length > 0) ? settings.navigation : [
+                { label: 'Home', route: 'home', icon: 'home' },
+                { label: 'Bookings', route: 'history', icon: 'time-outline' },
+                { label: 'Decor', route: 'decor', icon: 'color-palette-outline' },
+                { label: 'Profile', route: 'profile', icon: 'person' },
+            ],
+            layout: {
+                home: (settings.homeLayout && settings.homeLayout.length > 0)
+                    ? settings.homeLayout.sort((a, b) => a.order - b.order)
+                    : [
+                        { section: 'banners', visible: true, order: 1 },
+                        { section: 'categories', visible: true, order: 2 },
+                        { section: 'trending', visible: true, order: 3 }
+                    ]
+            },
+            banners: banners ?? [],
+            categories: categories ?? [],
+            trending: trending ?? [],
+            maintenance: settings.system?.maintenanceMode || false
         };
 
         res.json({

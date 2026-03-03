@@ -33,7 +33,7 @@ router.get('/', async (req, res) => {
         }
 
         const banners = await Banner.find(query).sort({ sortOrder: 1 });
-        res.json(banners);
+        res.json(banners ?? []);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

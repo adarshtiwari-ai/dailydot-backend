@@ -124,8 +124,8 @@ router.get("/", async (req, res) => {
 
     res.json({
       success: true,
-      count: services.length,
-      services,
+      count: (services || []).length,
+      services: services ?? [],
     });
   } catch (error) {
     console.error("Get services error:", error);

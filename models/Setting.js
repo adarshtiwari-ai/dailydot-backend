@@ -22,6 +22,8 @@ const settingSchema = new mongoose.Schema(
         theme: {
             primary: { type: String, default: "#4f46e5" },
             secondary: { type: String, default: "#818cf8" },
+            backgroundType: { type: String, enum: ['solid', 'gradient'], default: 'solid' },
+            gradientColors: { type: [String], default: ["#667eea", "#764ba2"] },
             fonts: {
                 main: { type: String, default: "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" },
                 heading: { type: String, default: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700&display=swap" }

@@ -39,6 +39,10 @@ const serviceSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isTrending: {
+    type: Boolean,
+    default: false
+  },
   section: {
     type: String,
     enum: ['general', 'car_on_wheels', 'decor'],

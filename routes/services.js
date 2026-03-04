@@ -53,6 +53,9 @@ router.get("/", async (req, res) => {
     if (isTopBooked === 'true') {
       query.isTopBooked = true;
     }
+    if (req.query.isTrending === 'true') {
+      query.isTrending = true;
+    }
     if (section) {
       query.section = section;
     }
@@ -440,6 +443,56 @@ router.delete("/:id", [auth, adminAuth], async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to delete service",
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/v1/services/{id}:
+ *   patch:
+ *     summary: Partially update service (Admin only)
+ *     tags: [Services]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Service updated successfully
+ */
+router.patch("/:id", [auth, adminAuth], async (req, res) => {
+  try {
+    const service = await Service.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: "Service not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Service updated successfully",
+      service,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to update service",
     });
   }
 });

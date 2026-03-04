@@ -46,21 +46,37 @@ const settingSchema = new mongoose.Schema(
         ],
         homeLayout: [
             {
-                section: { type: String, default: "banners" },
-                order: { type: Number, default: 1 },
-                visible: { type: Boolean, default: true }
-            },
-            {
                 section: { type: String, default: "categories" },
-                order: { type: Number, default: 2 },
-                visible: { type: Boolean, default: true }
+                order: { type: Number, default: 1 },
+                enabled: { type: Boolean, default: true }
             },
             {
-                section: { type: String, default: "trending" },
+                section: { type: String, default: "banners" },
+                order: { type: Number, default: 2 },
+                enabled: { type: Boolean, default: true }
+            },
+            {
+                section: { type: String, default: "recent_bookings" },
                 order: { type: Number, default: 3 },
-                visible: { type: Boolean, default: true }
+                enabled: { type: Boolean, default: true }
+            },
+            {
+                section: { type: String, default: "trending_services" },
+                order: { type: Number, default: 4 },
+                enabled: { type: Boolean, default: true }
+            },
+            {
+                section: { type: String, default: "safety_shield" },
+                order: { type: Number, default: 5 },
+                enabled: { type: Boolean, default: true }
             }
-        ]
+        ],
+        safetyShield: {
+            label1: { type: String, default: "Verified Pros" },
+            label2: { type: String, default: "Insured" },
+            label3: { type: String, default: "Quality Guaranteed" }
+        },
+        featuredServices: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Service' }]
     },
     { timestamps: true }
 );

@@ -17,10 +17,12 @@ router.get("/app-config", async (req, res) => {
         }
 
         // Fetch initial data for faster hydration
-        const [banners, categories, trending] = await Promise.all([
+        const [banners, categories, trendingServices] = await Promise.all([
             Banner.find({ isActive: true, placement: 'home' }).sort({ sortOrder: 1 }).limit(5),
             Category.find({ isActive: true }).sort({ sortOrder: 1 }).limit(10),
-            Service.find({ isActive: true, isTopBooked: true }).populate('category').limit(6)
+            settings.featuredServices && settings.featuredServices.length > 0
+                ? Service.find({ _id: { $in: settings.featuredServices }, isActive: true }).populate('category')
+                : Service.find({ isActive: true, isTopBooked: true }).populate('category').limit(6)
         ]);
 
         // Transform for mobile app consumption with robust defaults
@@ -38,16 +40,25 @@ router.get("/app-config", async (req, res) => {
             ],
             layout: {
                 home: (settings.homeLayout && settings.homeLayout.length > 0)
-                    ? settings.homeLayout.sort((a, b) => a.order - b.order)
+                    ? settings.homeLayout
+                        .filter(s => s.enabled !== false)
+                        .sort((a, b) => a.order - b.order)
                     : [
-                        { section: 'banners', visible: true, order: 1 },
-                        { section: 'categories', visible: true, order: 2 },
-                        { section: 'trending', visible: true, order: 3 }
+                        { section: 'categories', enabled: true, order: 1 },
+                        { section: 'banners', enabled: true, order: 2 },
+                        { section: 'recent_bookings', enabled: true, order: 3 },
+                        { section: 'trending_services', enabled: true, order: 4 },
+                        { section: 'safety_shield', enabled: true, order: 5 }
                     ]
+            },
+            safetyShield: settings.safetyShield || {
+                label1: "Verified Pros",
+                label2: "Insured",
+                label3: "Quality Guaranteed"
             },
             banners: banners ?? [],
             categories: categories ?? [],
-            trending: trending ?? [],
+            trending: trendingServices ?? [],
             maintenance: settings.system?.maintenanceMode || false
         };
 
@@ -87,10 +98,38 @@ router.get("/", auth, async (req, res) => {
     }
 });
 
+// Update specific layout section (Instant Update)
+router.patch("/layout/:section", [auth, adminAuth], async (req, res) => {
+    try {
+        const { section } = req.params;
+        const { enabled } = req.body;
+
+        const settings = await Setting.findOne();
+        if (!settings) return res.status(404).json({ success: false, message: "Settings not found" });
+
+        const layoutIndex = settings.homeLayout.findIndex(s => s.section === section);
+        if (layoutIndex === -1) {
+            return res.status(404).json({ success: false, message: "Section not found" });
+        }
+
+        settings.homeLayout[layoutIndex].enabled = enabled;
+        await settings.save();
+
+        res.json({
+            success: true,
+            message: `Section ${section} ${enabled ? 'enabled' : 'disabled'}`,
+            data: settings.homeLayout
+        });
+    } catch (error) {
+        console.error("Patch layout error:", error);
+        res.status(500).json({ success: false, message: "Update failed" });
+    }
+});
+
 // Update settings
 router.put("/", [auth, adminAuth], async (req, res) => {
     try {
-        const { system, notifications, theme, navigation, homeLayout } = req.body;
+        const { system, notifications, theme, navigation, homeLayout, safetyShield, featuredServices } = req.body;
         let settings = await Setting.findOne();
 
         if (!settings) {
@@ -103,6 +142,8 @@ router.put("/", [auth, adminAuth], async (req, res) => {
         if (theme) settings.theme = { ...settings.theme.toObject(), ...theme };
         if (navigation) settings.navigation = navigation;
         if (homeLayout) settings.homeLayout = homeLayout;
+        if (safetyShield) settings.safetyShield = safetyShield;
+        if (featuredServices) settings.featuredServices = featuredServices;
 
         await settings.save();
 

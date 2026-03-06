@@ -30,6 +30,8 @@ router.get("/app-config", async (req, res) => {
             theme: {
                 primary: settings.theme?.primary || "#667eea",
                 secondary: settings.theme?.secondary || "#764ba2",
+                backgroundType: settings.theme?.backgroundType || 'solid',
+                gradientColors: settings.theme?.gradientColors || ["#667eea", "#764ba2"],
                 fontUrls: settings.theme?.fontUrls || []
             },
             navigation: (settings.navigation && settings.navigation.length > 0) ? settings.navigation : [

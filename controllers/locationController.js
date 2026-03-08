@@ -60,6 +60,7 @@ const standardizeAddress = (data, provider, lat, lng) => {
 exports.reverseGeocode = async (req, res) => {
     try {
         const { lat, lng } = req.query;
+        console.log("BACKEND RECEIVED COORDS:", lat, lng);
         if (!lat || !lng) {
             return res.status(400).json({ success: false, message: 'Latitude and longitude are required' });
         }
@@ -70,7 +71,10 @@ exports.reverseGeocode = async (req, res) => {
         }
 
         const url = `https://api.olamaps.io/places/v1/reverse-geocode?latlng=${lat},${lng}&api_key=${OLA_API_KEY}`;
+        console.log("CALLING OLA WITH URL:", url.replace(OLA_API_KEY, 'HIDDEN_KEY'));
+
         const response = await axios.get(url, { timeout: 5000 });
+        console.log("OLA RAW JSON:", JSON.stringify(response.data, null, 2));
 
         // Return exactly the expected 7 parameter object
         if (response.data?.results?.length > 0) {
@@ -80,6 +84,7 @@ exports.reverseGeocode = async (req, res) => {
 
         throw new Error("No results found from Ola API");
     } catch (error) {
+        console.log("OLA API ERROR:", error.response?.status, error.response?.data);
         if (error.response && (error.response.status === 401 || error.response.status === 403)) {
             console.error("OLA API AUTH ERROR - Check Dashboard/Key");
         }

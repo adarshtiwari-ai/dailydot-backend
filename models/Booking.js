@@ -59,6 +59,22 @@ const bookingSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    // Dynamic Invoicing Fields
+    baseCost: {
+      type: Number,
+      default: function () { return this.totalAmount; }
+    },
+    finalTotal: {
+      type: Number,
+      default: function () { return this.totalAmount; }
+    },
+    materials: [
+      {
+        name: { type: String, required: true },
+        cost: { type: Number, required: true },
+        addedAt: { type: Date, default: Date.now }
+      }
+    ],
     // New Professional Reference
     assignedPro: {
       type: mongoose.Schema.Types.ObjectId,

@@ -4,8 +4,8 @@ const standardizeAddress = (data, provider, lat, lng) => {
     const results = data.results || [];
     if (results.length === 0) {
         return {
-            latitude: lat,
-            longitude: lng,
+            latitude: parseFloat(lat),
+            longitude: parseFloat(lng),
             addressLine1: 'Unknown Location',
             city: '',
             state: '',
@@ -26,19 +26,10 @@ const standardizeAddress = (data, provider, lat, lng) => {
         const components = firstResult.address_components || [];
 
         pincode = getComponent(components, 'postal_code');
-        city = getComponent(components, 'locality') || getComponent(components, 'district');
-        state = getComponent(components, 'administrative_area_level_1') || getComponent(components, 'state');
+        city = getComponent(components, 'locality') || getComponent(components, 'administrative_area_level_3');
+        state = getComponent(components, 'administrative_area_level_1');
 
-        const premise = getComponent(components, 'premise');
-        const route = getComponent(components, 'route');
-        const sublocality = getComponent(components, 'sublocality');
-
-        const stitchedAddress = [premise, route, sublocality]
-            .filter(Boolean)
-            .filter(part => part !== "NA" && !part.includes('+'))
-            .join(', ');
-
-        addressLine1 = firstResult.formatted_address || stitchedAddress;
+        addressLine1 = firstResult.name || (firstResult.formatted_address ? firstResult.formatted_address.split(',')[0] : '');
     }
 
     // Safety fallback
@@ -47,8 +38,8 @@ const standardizeAddress = (data, provider, lat, lng) => {
     }
 
     return {
-        latitude: lat,
-        longitude: lng,
+        latitude: parseFloat(lat),
+        longitude: parseFloat(lng),
         addressLine1: addressLine1,
         city: city,
         state: state,
@@ -98,8 +89,8 @@ exports.reverseGeocode = async (req, res) => {
 
         // Fallback or error return
         return res.status(200).json({
-            latitude: req.query.lat,
-            longitude: req.query.lng,
+            latitude: parseFloat(req.query.lat),
+            longitude: parseFloat(req.query.lng),
             addressLine1: 'Unknown Location',
             city: '',
             state: '',

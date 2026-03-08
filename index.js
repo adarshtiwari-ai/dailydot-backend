@@ -105,6 +105,7 @@ app.use("/api/v1/settings", require("./routes/settings"));
 app.use("/api/v1/banners", require("./routes/banner"));
 app.use("/api/v1/quick-fixes", require("./routes/quickFix"));
 app.use("/api/v1/professionals", require("./routes/professionals"));
+app.use("/api/location", require("./routes/location"));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

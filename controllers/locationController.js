@@ -73,7 +73,13 @@ exports.reverseGeocode = async (req, res) => {
         const url = `https://api.olamaps.io/places/v1/reverse-geocode?latlng=${lat},${lng}&api_key=${OLA_API_KEY}`;
         console.log("CALLING OLA WITH URL:", url.replace(OLA_API_KEY, 'HIDDEN_KEY'));
 
-        const response = await axios.get(url, { timeout: 5000 });
+        const response = await axios.get(url, {
+            timeout: 5000,
+            headers: {
+                'Origin': 'https://dailydot-api.onrender.com',
+                'Referer': 'https://dailydot-api.onrender.com/'
+            }
+        });
         console.log("OLA RAW JSON:", JSON.stringify(response.data, null, 2));
 
         // Return exactly the expected 7 parameter object

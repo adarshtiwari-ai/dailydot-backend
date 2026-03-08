@@ -1,4 +1,5 @@
 const Booking = require('../models/Booking');
+const { sendPushNotification } = require('../utils/pushService');
 
 exports.updateBookingStatus = async (req, res) => {
     try {
@@ -24,7 +25,27 @@ exports.updateBookingStatus = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Booking not found' });
         }
 
-        // TODO: This endpoint should eventually trigger a push notification back to the user's phone saying "Your booking is confirmed!"
+        if (booking.userId) {
+            let pushTitle = '';
+            let pushBody = '';
+
+            if (status.toLowerCase() === 'confirmed') {
+                pushTitle = 'Booking Confirmed! ✅';
+                pushBody = 'A professional has been assigned to your job.';
+            } else if (status.toLowerCase() === 'completed') {
+                pushTitle = 'Job Completed! 🎉';
+                pushBody = 'Your service is finished. Tap to view the final receipt.';
+            }
+
+            if (pushTitle && pushBody) {
+                await sendPushNotification(
+                    booking.userId,
+                    pushTitle,
+                    pushBody,
+                    { bookingId: booking._id.toString(), type: "status_update" }
+                );
+            }
+        }
 
         res.json({ success: true, message: `Booking status updated to ${status}`, booking });
     } catch (error) {
@@ -60,6 +81,15 @@ exports.addBookingMaterial = async (req, res) => {
         booking.finalTotal = booking.baseCost + materialsTotal;
 
         await booking.save();
+
+        if (booking.userId) {
+            await sendPushNotification(
+                booking.userId,
+                'Bill Updated 🧾',
+                'New materials were added to your booking. Tap to view the updated total.',
+                { bookingId: booking._id.toString(), type: "material_added" }
+            );
+        }
 
         res.json({ success: true, message: 'Material added successfully', booking });
     } catch (error) {

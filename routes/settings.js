@@ -139,7 +139,10 @@ router.put("/", [auth, adminAuth], async (req, res) => {
         }
 
         // Update fields if provided
-        if (system) settings.system = { ...settings.system.toObject(), ...system };
+        if (system) {
+            settings.system = { ...settings.system.toObject(), ...system };
+            settings.markModified('system');
+        }
         if (notifications) settings.notifications = { ...settings.notifications.toObject(), ...notifications };
         if (theme) settings.theme = { ...settings.theme.toObject(), ...theme };
         if (navigation) settings.navigation = navigation;

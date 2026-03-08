@@ -198,9 +198,11 @@ exports.updateBookingStatus = async (req, res) => {
             updateData.assignedPro = assignedProId;
         }
 
-        const booking = await Booking.findByIdAndUpdate(req.params.id, updateData, {
-            new: true,
-        }).populate("assignedPro");
+        const booking = await Booking.findByIdAndUpdate(
+            req.params.id,
+            { $set: updateData },
+            { new: true }
+        ).populate("assignedPro");
 
         if (!booking) {
             return res.status(404).json({

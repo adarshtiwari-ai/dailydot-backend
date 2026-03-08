@@ -128,22 +128,24 @@ exports.reverseGeocode = async (req, res) => {
 
             if (googleResponse.data.results && googleResponse.data.results.length > 0) {
                 const firstResult = googleResponse.data.results[0];
-                const gComponents = firstResult.address_components || [];
+                const components = firstResult.address_components || [];
 
-                const getComponent = (typesToFind) => {
-                    const comp = gComponents.find(c => c.types.some(t => typesToFind.includes(t)));
+                const getGComponent = (typesToFind) => {
+                    const comp = components.find(c => c.types.some(t => typesToFind.includes(t)));
                     return comp ? comp.long_name : '';
                 };
 
-                // Google's specific extraction
-                city = getComponent(['locality', 'administrative_area_level_2']);
-                state = getComponent(['administrative_area_level_1']);
-                pincode = getComponent(['postal_code']);
+                city = getGComponent(['locality', 'administrative_area_level_3']);
+                state = getGComponent(['administrative_area_level_1']);
+                pincode = getGComponent(['postal_code']);
 
-                const route = getComponent(['route']);
-                const neighborhood = getComponent(['neighborhood', 'sublocality', 'sublocality_level_1']);
-
-                addressLine1 = firstResult.formatted_address ? firstResult.formatted_address.split(',')[0] : [route, neighborhood].filter(Boolean).join(', ') || 'Unknown Location';
+                // Build Address Line 1: Strip out ugly Plus Codes (containing '+')
+                addressLine1 = getGComponent(['premise', 'route', 'sublocality', 'neighborhood']);
+                if (!addressLine1) {
+                    const addressParts = firstResult.formatted_address.split(',').map(p => p.trim());
+                    // Find the first part of the address that doesn't look like a Plus Code
+                    addressLine1 = addressParts.find(p => !p.includes('+')) || city || 'Unknown Location';
+                }
                 nickname = 'Home';
             } else {
                 throw new Error("No results found from Google Maps Geocoding API");

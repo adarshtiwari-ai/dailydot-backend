@@ -9,6 +9,7 @@ const settingSchema = new mongoose.Schema(
             maintenanceMode: { type: Boolean, default: false },
             allowRegistrations: { type: Boolean, default: true },
             autoBackup: { type: Boolean, default: true },
+            activeMapProvider: { type: String, enum: ['ola', 'google'], default: 'ola' }
         },
         notifications: {
             newBookings: { type: Boolean, default: true },

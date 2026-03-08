@@ -163,4 +163,34 @@ router.put("/", [auth, adminAuth], async (req, res) => {
     }
 });
 
+// Update Map Provider Strategy
+router.put("/map-provider", [auth, adminAuth], async (req, res) => {
+    try {
+        const { provider } = req.body;
+        if (!['ola', 'google'].includes(provider)) {
+            return res.status(400).json({ success: false, message: "Invalid provider specified" });
+        }
+
+        let settings = await Setting.findOne();
+        if (!settings) {
+            settings = new Setting();
+        }
+
+        settings.system.activeMapProvider = provider;
+        await settings.save();
+
+        res.json({
+            success: true,
+            message: `Map provider updated to ${provider.toUpperCase()}`,
+            data: settings.system.activeMapProvider
+        });
+    } catch (error) {
+        console.error("Update map provider error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update map provider"
+        });
+    }
+});
+
 module.exports = router;

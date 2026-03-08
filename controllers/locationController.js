@@ -56,63 +56,108 @@ exports.reverseGeocode = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Latitude and longitude are required' });
         }
 
-        const OLA_API_KEY = process.env.OLA_MAPS_API_KEY;
-        if (!OLA_API_KEY) {
-            return res.status(500).json({ success: false, message: 'Server missing OLA_MAPS_API_KEY' });
-        }
+        const Setting = require('../models/Setting');
+        let settings = await Setting.findOne();
+        if (!settings) settings = await Setting.create({});
 
-        const url = `https://api.olamaps.io/places/v1/reverse-geocode?latlng=${lat},${lng}&api_key=${OLA_API_KEY}`;
-        console.log("CALLING OLA WITH URL:", url.replace(OLA_API_KEY, 'HIDDEN_KEY'));
+        const provider = settings.system?.activeMapProvider || 'ola';
 
-        const response = await axios.get(url, {
-            timeout: 5000,
-            headers: {
-                'Origin': 'https://dailydot-api.onrender.com',
-                'Referer': 'https://dailydot-api.onrender.com/'
+        if (provider === 'ola') {
+            const OLA_API_KEY = process.env.OLA_MAPS_API_KEY;
+            if (!OLA_API_KEY) {
+                console.error("Server missing OLA_MAPS_API_KEY");
+                return res.status(500).json({ success: false, message: 'Server configuration error' });
             }
-        });
-        console.log("OLA RAW JSON:", JSON.stringify(response.data, null, 2));
 
-        if (response.data?.results?.length > 0) {
-            const firstResult = response.data.results[0];
-            const components = firstResult.address_components || [];
+            const url = `https://api.olamaps.io/places/v1/reverse-geocode?latlng=${lat},${lng}&api_key=${OLA_API_KEY}`;
+            console.log("CALLING OLA WITH URL:", url.replace(OLA_API_KEY, 'HIDDEN_KEY'));
 
-            const getComponent = (typesToFind) => {
-                const comp = components.find(c => c.types.some(t => typesToFind.includes(t)));
-                return comp ? comp.long_name : '';
-            };
-
-            const city = getComponent(['locality', 'administrative_area_level_3']);
-            const state = getComponent(['administrative_area_level_1']);
-            const pincode = getComponent(['postal_code']);
-
-            const placeName = firstResult.name || getComponent(['sublocality_level_3', 'premise', 'point_of_interest']);
-            const neighborhood = getComponent(['sublocality', 'neighborhood']);
-
-            const addressLine1 = [placeName, neighborhood]
-                .filter(Boolean)
-                .join(', ') || (firstResult.formatted_address ? firstResult.formatted_address.split(',')[0] : 'Unknown Location');
-
-            return res.status(200).json({
-                latitude: parseFloat(req.query.lat),
-                longitude: parseFloat(req.query.lng),
-                addressLine1,
-                city,
-                state,
-                pincode,
-                nickname: 'Home'
+            const response = await axios.get(url, {
+                timeout: 5000,
+                headers: {
+                    'Origin': 'https://dailydot-api.onrender.com',
+                    'Referer': 'https://dailydot-api.onrender.com/'
+                }
             });
+
+            if (response.data?.results?.length > 0) {
+                const firstResult = response.data.results[0];
+                const components = firstResult.address_components || [];
+
+                const getComponent = (typesToFind) => {
+                    const comp = components.find(c => c.types.some(t => typesToFind.includes(t)));
+                    return comp ? comp.long_name : '';
+                };
+
+                const city = getComponent(['locality', 'administrative_area_level_3']);
+                const state = getComponent(['administrative_area_level_1']);
+                const pincode = getComponent(['postal_code']);
+
+                const placeName = firstResult.name || getComponent(['sublocality_level_3', 'premise', 'point_of_interest']);
+                const neighborhood = getComponent(['sublocality', 'neighborhood']);
+
+                const addressLine1 = [placeName, neighborhood]
+                    .filter(Boolean)
+                    .join(', ') || (firstResult.formatted_address ? firstResult.formatted_address.split(',')[0] : 'Unknown Location');
+
+                return res.status(200).json({
+                    latitude: parseFloat(req.query.lat),
+                    longitude: parseFloat(req.query.lng),
+                    addressLine1,
+                    city,
+                    state,
+                    pincode,
+                    nickname: 'Home'
+                });
+            }
+        } else if (provider === 'google') {
+            const GOOGLE_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+            if (!GOOGLE_API_KEY) {
+                console.error("Server missing GOOGLE_MAPS_API_KEY");
+                return res.status(500).json({ success: false, message: 'Server configuration error' });
+            }
+
+            const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`;
+            console.log("CALLING GOOGLE MAPS WITH URL (KEY HIDDEN)");
+
+            const response = await axios.get(url, { timeout: 5000 });
+
+            if (response.data?.results?.length > 0) {
+                const firstResult = response.data.results[0];
+                const components = firstResult.address_components || [];
+
+                const getComponent = (typesToFind) => {
+                    const comp = components.find(c => c.types.some(t => typesToFind.includes(t)));
+                    return comp ? comp.long_name : '';
+                };
+
+                const city = getComponent(['locality', 'administrative_area_level_3']);
+                const state = getComponent(['administrative_area_level_1']);
+                const pincode = getComponent(['postal_code']);
+
+                const placeName = getComponent(['sublocality_level_3', 'premise', 'point_of_interest']);
+                const neighborhood = getComponent(['sublocality', 'neighborhood', 'sublocality_level_1']);
+
+                const addressLine1 = [placeName, neighborhood]
+                    .filter(Boolean)
+                    .join(', ') || (firstResult.formatted_address ? firstResult.formatted_address.split(',')[0] : 'Unknown Location');
+
+                return res.status(200).json({
+                    latitude: parseFloat(req.query.lat),
+                    longitude: parseFloat(req.query.lng),
+                    addressLine1,
+                    city,
+                    state,
+                    pincode,
+                    nickname: 'Home'
+                });
+            }
         }
 
-        throw new Error("No results found from Ola API");
+        throw new Error("No results found from Geocoding API");
     } catch (error) {
-        console.log("OLA API ERROR:", error.response?.status, error.response?.data);
-        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-            console.error("OLA API AUTH ERROR - Check Dashboard/Key");
-        }
-        console.error("[LocationController] Ola Reverse Geocode Failed:", error.message);
+        console.error("[LocationController] Reverse Geocode Failed:", error.message);
 
-        // Fallback or error return
         return res.status(200).json({
             latitude: parseFloat(req.query.lat),
             longitude: parseFloat(req.query.lng),

@@ -73,10 +73,35 @@ exports.reverseGeocode = async (req, res) => {
         });
         console.log("OLA RAW JSON:", JSON.stringify(response.data, null, 2));
 
-        // Return exactly the expected 7 parameter object
         if (response.data?.results?.length > 0) {
-            const standardized = standardizeAddress(response.data, 'ola', lat, lng);
-            return res.status(200).json(standardized);
+            const firstResult = response.data.results[0];
+            const components = firstResult.address_components || [];
+
+            const getComponent = (typesToFind) => {
+                const comp = components.find(c => c.types.some(t => typesToFind.includes(t)));
+                return comp ? comp.long_name : '';
+            };
+
+            const city = getComponent(['locality', 'administrative_area_level_3']);
+            const state = getComponent(['administrative_area_level_1']);
+            const pincode = getComponent(['postal_code']);
+
+            const placeName = firstResult.name || getComponent(['sublocality_level_3', 'premise', 'point_of_interest']);
+            const neighborhood = getComponent(['sublocality', 'neighborhood']);
+
+            const addressLine1 = [placeName, neighborhood]
+                .filter(Boolean)
+                .join(', ') || (firstResult.formatted_address ? firstResult.formatted_address.split(',')[0] : 'Unknown Location');
+
+            return res.status(200).json({
+                latitude: parseFloat(req.query.lat),
+                longitude: parseFloat(req.query.lng),
+                addressLine1,
+                city,
+                state,
+                pincode,
+                nickname: 'Home'
+            });
         }
 
         throw new Error("No results found from Ola API");

@@ -65,11 +65,19 @@ const userSchema = new mongoose.Schema({
     city: String,
     state: String,
     pincode: String,
-    receiverName: String,
     receiverPhone: String,
     isDefault: Boolean,
-    latitude: Number,
-    longitude: Number,
+    location: {
+      type: {
+        type: String,
+        enum: ['Point'],
+        default: 'Point'
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+        default: [0, 0]
+      }
+    }
   }],
   isActive: {
     type: Boolean,

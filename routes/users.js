@@ -244,6 +244,8 @@ router.post(
     body("pincode").notEmpty().withMessage("Pincode is required"),
   ],
   async (req, res) => {
+    console.log("PAYLOAD IN (Add Address):", req.body);
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ success: false, errors: errors.array() });
@@ -265,7 +267,20 @@ router.post(
         user.addresses.forEach(addr => addr.isDefault = false);
       }
 
-      user.addresses.push(req.body);
+      const newAddress = { ...req.body };
+
+      // Inject Strict GeoJSON Point
+      if (req.body.latitude && req.body.longitude) {
+        newAddress.location = {
+          type: 'Point',
+          coordinates: [Number(req.body.longitude), Number(req.body.latitude)]
+        };
+        // Clean up old fields so they don't accidentally save into strict schema if it changes
+        delete newAddress.latitude;
+        delete newAddress.longitude;
+      }
+
+      user.addresses.push(newAddress);
       await user.save();
 
       res.status(200).json({
@@ -305,6 +320,7 @@ router.delete("/addresses/:addressId", auth, async (req, res) => {
 
 // Update Address (General Update)
 router.put("/addresses/:addressId", auth, async (req, res) => {
+  console.log("PAYLOAD IN (Update Address):", req.body);
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
@@ -318,16 +334,24 @@ router.put("/addresses/:addressId", auth, async (req, res) => {
     }
 
     // Update fields
-    const { addressLine1, addressLine2, city, state, pincode, type, receiverName, receiverPhone, isDefault } = req.body;
+    const { addressLine1, addressLine2, city, state, pincode, type, receiverName, receiverPhone, isDefault, latitude, longitude } = req.body;
 
     // If setting default, unset others first
     if (isDefault) {
       user.addresses.forEach(a => a.isDefault = false);
     }
 
+    let locationUpdate = user.addresses[addressIndex].location;
+    if (latitude && longitude) {
+      locationUpdate = {
+        type: 'Point',
+        coordinates: [Number(longitude), Number(latitude)]
+      };
+    }
+
     user.addresses[addressIndex] = {
       ...user.addresses[addressIndex].toObject(), // Keep existing ID
-      addressLine1, addressLine2, city, state, pincode, type, receiverName, receiverPhone, isDefault
+      addressLine1, addressLine2, city, state, pincode, type, receiverName, receiverPhone, isDefault, location: locationUpdate
     };
 
     await user.save();

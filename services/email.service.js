@@ -33,11 +33,11 @@ const emailTemplates = {
   }),
 
   bookingConfirmation: (booking, user) => ({
-    subject: `Booking Confirmed - ${booking.bookingNumber}`,
+    subject: `Service Booked - ${booking.bookingNumber}`,
     html: `
-      <h2>Booking Confirmation</h2>
+      <h2>Service Booked</h2>
       <p>Hi ${user?.name || 'User'},</p>
-      <p>Your booking has been confirmed!</p>
+      <p>Your booking has been received and is pending assignment!</p>
       <div style="border: 1px solid #ddd; padding: 15px; margin: 15px 0;">
         <p><strong>Booking Number:</strong> ${booking.bookingNumber}</p>
         <p><strong>Service:</strong> ${booking.items?.[0]?.name || 'Home Service'}</p>

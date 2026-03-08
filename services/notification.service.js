@@ -47,8 +47,8 @@ class NotificationService {
           if (userId) {
             results.push = await this.sendPushNotification(
               userId,
-              "Booking Confirmed! ✅",
-              `Your booking #${booking.bookingNumber} has been confirmed.`,
+              "Service Booked! 🎉",
+              `Your booking #${booking.bookingNumber} has been received and is pending assignment.`,
               { bookingId: booking._id.toString(), type: "booking_confirmation" }
             );
           }

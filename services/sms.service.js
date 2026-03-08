@@ -10,7 +10,7 @@ class SMSService {
      * @param {string} bookingNumber 
      */
     async sendBookingConfirmation(phone, bookingNumber) {
-        console.log(`[Mock SMS] Booking Confirmation sent to ${phone}: Your booking #${bookingNumber} is confirmed.`);
+        console.log(`[Mock SMS] Booking Confirmation sent to ${phone}: Your booking #${bookingNumber} has been received and is pending assignment.`);
         return { success: true, messageId: 'mock-sms-id-1' };
     }
 

@@ -62,6 +62,12 @@ exports.reverseGeocode = async (req, res) => {
 
         const provider = settings.system?.activeMapProvider || 'ola';
 
+        let addressLine1 = 'Unknown Location';
+        let city = '';
+        let state = '';
+        let pincode = '';
+        let nickname = 'Current Location';
+
         if (provider === 'ola') {
             const OLA_API_KEY = process.env.OLA_MAPS_API_KEY;
             if (!OLA_API_KEY) {
@@ -80,7 +86,7 @@ exports.reverseGeocode = async (req, res) => {
                 }
             });
 
-            if (response.data?.results?.length > 0) {
+            if (response.data?.status === 'ok' && response.data?.results?.length > 0) {
                 const firstResult = response.data.results[0];
                 const components = firstResult.address_components || [];
 
@@ -89,26 +95,19 @@ exports.reverseGeocode = async (req, res) => {
                     return comp ? comp.long_name : '';
                 };
 
-                const city = getComponent(['locality', 'administrative_area_level_3']);
-                const state = getComponent(['administrative_area_level_1']);
-                const pincode = getComponent(['postal_code']);
+                city = getComponent(['locality', 'administrative_area_level_3']);
+                state = getComponent(['administrative_area_level_1']);
+                pincode = getComponent(['postal_code']);
 
                 const placeName = firstResult.name || getComponent(['sublocality_level_3', 'premise', 'point_of_interest']);
                 const neighborhood = getComponent(['sublocality', 'neighborhood']);
 
-                const addressLine1 = [placeName, neighborhood]
+                addressLine1 = [placeName, neighborhood]
                     .filter(Boolean)
                     .join(', ') || (firstResult.formatted_address ? firstResult.formatted_address.split(',')[0] : 'Unknown Location');
-
-                return res.status(200).json({
-                    latitude: parseFloat(req.query.lat),
-                    longitude: parseFloat(req.query.lng),
-                    addressLine1,
-                    city,
-                    state,
-                    pincode,
-                    nickname: 'Home'
-                });
+                nickname = 'Home';
+            } else {
+                throw new Error("No results found from Ola Maps Geocoding API");
             }
         } else if (provider === 'google') {
             const GOOGLE_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
@@ -120,41 +119,50 @@ exports.reverseGeocode = async (req, res) => {
             const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`;
             console.log("CALLING GOOGLE MAPS WITH URL (KEY HIDDEN)");
 
-            const response = await axios.get(url, { timeout: 5000 });
+            const googleResponse = await axios.get(url, { timeout: 5000 });
+            console.log("GOOGLE RAW JSON:", JSON.stringify(googleResponse.data, null, 2));
 
-            if (response.data?.results?.length > 0) {
-                const firstResult = response.data.results[0];
-                const components = firstResult.address_components || [];
+            if (googleResponse.data.status !== 'OK') {
+                throw new Error('Google API returned: ' + googleResponse.data.status);
+            }
+
+            if (googleResponse.data.results && googleResponse.data.results.length > 0) {
+                const firstResult = googleResponse.data.results[0];
+                const gComponents = firstResult.address_components || [];
 
                 const getComponent = (typesToFind) => {
-                    const comp = components.find(c => c.types.some(t => typesToFind.includes(t)));
+                    const comp = gComponents.find(c => c.types.some(t => typesToFind.includes(t)));
                     return comp ? comp.long_name : '';
                 };
 
-                const city = getComponent(['locality', 'administrative_area_level_3']);
-                const state = getComponent(['administrative_area_level_1']);
-                const pincode = getComponent(['postal_code']);
+                // Google's specific extraction
+                city = getComponent(['locality', 'administrative_area_level_2']);
+                state = getComponent(['administrative_area_level_1']);
+                pincode = getComponent(['postal_code']);
 
-                const placeName = getComponent(['sublocality_level_3', 'premise', 'point_of_interest']);
-                const neighborhood = getComponent(['sublocality', 'neighborhood', 'sublocality_level_1']);
+                const route = getComponent(['route']);
+                const neighborhood = getComponent(['neighborhood', 'sublocality', 'sublocality_level_1']);
 
-                const addressLine1 = [placeName, neighborhood]
-                    .filter(Boolean)
-                    .join(', ') || (firstResult.formatted_address ? firstResult.formatted_address.split(',')[0] : 'Unknown Location');
-
-                return res.status(200).json({
-                    latitude: parseFloat(req.query.lat),
-                    longitude: parseFloat(req.query.lng),
-                    addressLine1,
-                    city,
-                    state,
-                    pincode,
-                    nickname: 'Home'
-                });
+                addressLine1 = firstResult.formatted_address ? firstResult.formatted_address.split(',')[0] : [route, neighborhood].filter(Boolean).join(', ') || 'Unknown Location';
+                nickname = 'Home';
+            } else {
+                throw new Error("No results found from Google Maps Geocoding API");
             }
+        } else {
+            throw new Error("Invalid Map Provider logic flag");
         }
 
-        throw new Error("No results found from Geocoding API");
+        // UNIFIED RETURN STATEMENT
+        return res.status(200).json({
+            latitude: parseFloat(lat),
+            longitude: parseFloat(lng),
+            addressLine1,
+            city,
+            state,
+            pincode,
+            nickname
+        });
+
     } catch (error) {
         console.error("[LocationController] Reverse Geocode Failed:", error.message);
 

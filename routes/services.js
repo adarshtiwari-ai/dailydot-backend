@@ -125,6 +125,7 @@ router.get("/", async (req, res) => {
       });
     }
 
+    console.log("📡 ADMIN FETCH SENDING", (services || []).length, "ITEMS.");
     res.json({
       success: true,
       count: (services || []).length,
@@ -309,6 +310,7 @@ router.post(
       }
 
       const service = await Service.create(req.body);
+      console.log("💾 DB SAVE SUCCESS:", JSON.stringify(service, null, 2));
 
       res.status(201).json({
         success: true,

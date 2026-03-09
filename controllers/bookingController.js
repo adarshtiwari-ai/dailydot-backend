@@ -48,11 +48,11 @@ exports.createBooking = async (req, res) => {
             detailedItems.push({
                 serviceId: service._id,
                 name: service.name,
-                price: service.price,
+                price: Math.round(service.price * 100),
                 quantity: item.quantity || 1,
             });
 
-            totalAmount += service.price * (item.quantity || 1);
+            totalAmount += Math.round(service.price * 100) * (item.quantity || 1);
         }
 
         // Generate booking number
@@ -561,24 +561,21 @@ exports.generateInvoice = async (req, res) => {
 
         const documentType = booking.status === "completed" || booking.billingStatus === "invoiced" ? "TAX INVOICE" : "SERVICE ESTIMATE / QUOTE";
 
-        // Convert paise to rupees
-        const toRupees = (paise) => (paise || 0) / 100;
-
-        const baseCostConverted = toRupees(booking.baseCost);
-
-        let subtotalConverted = baseCostConverted;
+        // Use strict Paise integers for the JSON payload
+        const baseCostPaise = booking.baseCost || booking.totalAmount || 0;
+        let subtotalPaise = baseCostPaise;
 
         const lineItems = [
             {
                 description: "Base Service Cost",
-                amount: baseCostConverted
+                amount: baseCostPaise
             }
         ];
 
         if (booking.adjustments && booking.adjustments.length > 0) {
             booking.adjustments.forEach(adj => {
-                const adjAmount = toRupees(adj.amount);
-                subtotalConverted += adjAmount;
+                const adjAmount = adj.amount;
+                subtotalPaise += adjAmount;
                 lineItems.push({
                     description: adj.reason,
                     amount: adjAmount,
@@ -587,10 +584,11 @@ exports.generateInvoice = async (req, res) => {
             });
         }
 
-        const cgstConverted = toRupees(booking.taxDetails?.cgst);
-        const sgstConverted = toRupees(booking.taxDetails?.sgst);
-        const platformFeeConverted = toRupees(booking.taxDetails?.platformFee);
-        const grandTotalConverted = toRupees(booking.finalTotal);
+        // Ensure all amounts are in Paise. No toRupees conversion needed as they are already expected in Paise.
+        const cgstPaise = booking.taxDetails?.cgst || 0;
+        const sgstPaise = booking.taxDetails?.sgst || 0;
+        const platformFeePaise = booking.taxDetails?.platformFee || 0;
+        const grandTotalPaise = booking.finalTotal || booking.totalAmount || 0;
 
         // Address resolution
         const customerAddress = booking.serviceAddress
@@ -612,11 +610,11 @@ exports.generateInvoice = async (req, res) => {
             },
             lineItems: lineItems,
             summary: {
-                subtotal: subtotalConverted,
-                cgst: cgstConverted,
-                sgst: sgstConverted,
-                platformFee: platformFeeConverted,
-                grandTotal: grandTotalConverted
+                subtotal: subtotalPaise,
+                cgst: cgstPaise,
+                sgst: sgstPaise,
+                platformFee: platformFeePaise,
+                grandTotal: grandTotalPaise
             },
             paymentStatus: {
                 status: booking.paymentStatus,

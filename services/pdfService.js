@@ -66,7 +66,7 @@ const generateInvoicePDF = (invoiceData, res) => {
     let currentY = doc.y;
     invoiceData.lineItems.forEach(item => {
         doc.text(item.description, 50, currentY);
-        doc.text(item.amount.toFixed(2), 400, currentY, { width: 100, align: 'right' });
+        doc.text((Number(item.amount) / 100).toFixed(2), 400, currentY, { width: 100, align: 'right' });
         currentY += 20;
     });
 
@@ -84,23 +84,23 @@ const generateInvoicePDF = (invoiceData, res) => {
     doc.font('Helvetica');
     // Subtotal
     doc.text('Subtotal:', summaryX, sumY);
-    doc.text(invoiceData.summary.subtotal.toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
+    doc.text((Number(invoiceData.summary.subtotal) / 100).toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
     sumY += 15;
 
     // CGST
     doc.text('CGST (9%):', summaryX, sumY);
-    doc.text(invoiceData.summary.cgst.toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
+    doc.text((Number(invoiceData.summary.cgst) / 100).toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
     sumY += 15;
 
     // SGST
     doc.text('SGST (9%):', summaryX, sumY);
-    doc.text(invoiceData.summary.sgst.toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
+    doc.text((Number(invoiceData.summary.sgst) / 100).toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
     sumY += 20;
 
     // Grand Total
     doc.font('Helvetica-Bold').fontSize(12);
     doc.text('Grand Total:', summaryX, sumY);
-    doc.text(invoiceData.summary.grandTotal.toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
+    doc.text((Number(invoiceData.summary.grandTotal) / 100).toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
 
     // Finalize
     doc.end();

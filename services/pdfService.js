@@ -88,18 +88,13 @@ const generateInvoicePDF = (invoiceData, res) => {
     sumY += 15;
 
     // CGST
-    doc.text('CGST:', summaryX, sumY);
+    doc.text('CGST (9%):', summaryX, sumY);
     doc.text(invoiceData.summary.cgst.toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
     sumY += 15;
 
     // SGST
-    doc.text('SGST:', summaryX, sumY);
+    doc.text('SGST (9%):', summaryX, sumY);
     doc.text(invoiceData.summary.sgst.toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
-    sumY += 15;
-
-    // Platform Fee
-    doc.text('Platform Fee:', summaryX, sumY);
-    doc.text(invoiceData.summary.platformFee.toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
     sumY += 20;
 
     // Grand Total

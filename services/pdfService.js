@@ -18,7 +18,7 @@ const generateInvoicePDF = (invoiceData, res) => {
         .font('Helvetica-Bold')
         .text('DailyDot', 50, 50)
         .fontSize(16)
-        .text('INVOICE', 0, 50, { align: 'right' });
+        .text(invoiceData.documentType || 'INVOICE', 0, 50, { align: 'right' });
 
     doc.moveDown();
 

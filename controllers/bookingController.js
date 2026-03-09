@@ -555,9 +555,11 @@ exports.generateInvoice = async (req, res) => {
         }
 
         // Must be finalized or invoiced
-        if (booking.billingStatus === "quote" || !booking.billingStatus) {
-            return res.status(400).json({ success: false, message: "Cannot generate invoice for incomplete bookings." });
-        }
+        // if (booking.billingStatus === "quote" || !booking.billingStatus) {
+        //     return res.status(400).json({ success: false, message: "Cannot generate invoice for incomplete bookings." });
+        // }
+
+        const documentType = booking.status === "completed" || booking.billingStatus === "invoiced" ? "TAX INVOICE" : "SERVICE ESTIMATE / QUOTE";
 
         // Convert paise to rupees
         const toRupees = (paise) => (paise || 0) / 100;
@@ -619,7 +621,8 @@ exports.generateInvoice = async (req, res) => {
             paymentStatus: {
                 status: booking.paymentStatus,
                 method: booking.paymentMethod
-            }
+            },
+            documentType: documentType
         };
 
         // If it was finalized, update it to invoiced

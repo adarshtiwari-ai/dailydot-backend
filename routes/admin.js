@@ -14,4 +14,7 @@ router.patch('/bookings/:id/adjust', adminController.adjustBookingPrice);
 // POST /api/v1/admin/providers/:id/settle
 router.post('/providers/:id/settle', adminController.settleProviderDues);
 
+// GET /api/v1/admin/providers/wallets
+router.get('/providers/wallets', adminController.getProviderWallets);
+
 module.exports = router;

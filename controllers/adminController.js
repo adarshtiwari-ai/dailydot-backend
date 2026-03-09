@@ -2,6 +2,7 @@ const Booking = require('../models/Booking');
 const { sendPushNotification } = require('../utils/pushService');
 const { calculateBillDetails } = require('../services/billingService');
 const walletService = require('../services/walletService');
+const ProviderWallet = require('../models/ProviderWallet');
 
 exports.updateBookingStatus = async (req, res) => {
     try {
@@ -168,5 +169,18 @@ exports.settleProviderDues = async (req, res) => {
     } catch (error) {
         console.error('Error settling provider dues:', error);
         res.status(500).json({ success: false, message: 'Server error while settling dues' });
+    }
+};
+
+exports.getProviderWallets = async (req, res) => {
+    try {
+        const wallets = await ProviderWallet.find()
+            .populate('providerId', 'name phone email')
+            .sort({ balance: 1 }); // those with negative balance (debt) at the top
+
+        res.json({ success: true, count: wallets.length, wallets });
+    } catch (error) {
+        console.error('Error fetching provider wallets:', error);
+        res.status(500).json({ success: false, message: 'Server error while fetching wallets' });
     }
 };

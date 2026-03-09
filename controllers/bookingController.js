@@ -4,6 +4,8 @@ const Professional = require("../models/Professional");
 const Service = require("../models/Service");
 const { validationResult } = require("express-validator");
 const eventHub = require("../services/event.service");
+const { generateInvoicePDF } = require("../services/pdfService");
+const walletService = require("../services/walletService");
 
 // @desc    Create a new booking
 // @route   POST /api/v1/bookings
@@ -209,6 +211,22 @@ exports.updateBookingStatus = async (req, res) => {
                 success: false,
                 message: "Booking not found",
             });
+        }
+
+        // Provider Debt Ledger Hook
+        if (
+            (status === "completed" || status === "Completed") &&
+            (booking.paymentMethod === "cod" || booking.paymentMethod === "cash") &&
+            booking.billingStatus === "invoiced" &&
+            booking.taxDetails &&
+            booking.taxDetails.platformFee > 0 &&
+            booking.assignedPro
+        ) {
+            await walletService.chargePlatformFee(
+                booking.assignedPro._id || booking.assignedPro,
+                booking._id,
+                booking.taxDetails.platformFee
+            );
         }
 
         res.json({
@@ -515,5 +533,112 @@ exports.getAllBookings = async (req, res) => {
             success: false,
             message: "Failed to fetch bookings",
         });
+    }
+};
+
+// @desc    Generate Invoice JSON
+// @route   GET /api/v1/bookings/:id/invoice
+// @access  Private
+exports.generateInvoice = async (req, res) => {
+    try {
+        const booking = await Booking.findById(req.params.id)
+            .populate("userId", "name phone addresses")
+            .populate("assignedPro", "name");
+
+        if (!booking) {
+            return res.status(404).json({ success: false, message: "Booking not found" });
+        }
+
+        // Check ownership or admin
+        if (booking.userId._id.toString() !== req.user._id.toString() && req.user.role !== "admin") {
+            return res.status(403).json({ success: false, message: "Access denied" });
+        }
+
+        // Must be finalized or invoiced
+        if (booking.billingStatus === "quote" || !booking.billingStatus) {
+            return res.status(400).json({ success: false, message: "Cannot generate invoice for incomplete bookings." });
+        }
+
+        // Convert paise to rupees
+        const toRupees = (paise) => (paise || 0) / 100;
+
+        const baseCostConverted = toRupees(booking.baseCost);
+
+        let subtotalConverted = baseCostConverted;
+
+        const lineItems = [
+            {
+                description: "Base Service Cost",
+                amount: baseCostConverted
+            }
+        ];
+
+        if (booking.adjustments && booking.adjustments.length > 0) {
+            booking.adjustments.forEach(adj => {
+                const adjAmount = toRupees(adj.amount);
+                subtotalConverted += adjAmount;
+                lineItems.push({
+                    description: adj.reason,
+                    amount: adjAmount,
+                    date: adj.addedAt
+                });
+            });
+        }
+
+        const cgstConverted = toRupees(booking.taxDetails?.cgst);
+        const sgstConverted = toRupees(booking.taxDetails?.sgst);
+        const platformFeeConverted = toRupees(booking.taxDetails?.platformFee);
+        const grandTotalConverted = toRupees(booking.finalTotal);
+
+        // Address resolution
+        const customerAddress = booking.serviceAddress
+            ? `${booking.serviceAddress.addressLine1}, ${booking.serviceAddress.city}`
+            : (booking.userId.addresses && booking.userId.addresses[0]
+                ? booking.userId.addresses[0].addressLine1
+                : "Address not matched");
+
+        const invoice = {
+            invoiceId: `INV-${booking._id.toString().slice(-6).toUpperCase()}`,
+            date: new Date(),
+            customer: {
+                name: booking.name || booking.userId.name,
+                phone: booking.phone || booking.userId.phone,
+                address: customerAddress
+            },
+            provider: {
+                name: booking.assignedPro ? booking.assignedPro.name : "Unassigned"
+            },
+            lineItems: lineItems,
+            summary: {
+                subtotal: subtotalConverted,
+                cgst: cgstConverted,
+                sgst: sgstConverted,
+                platformFee: platformFeeConverted,
+                grandTotal: grandTotalConverted
+            },
+            paymentStatus: {
+                status: booking.paymentStatus,
+                method: booking.paymentMethod
+            }
+        };
+
+        // If it was finalized, update it to invoiced
+        if (booking.billingStatus === "finalized") {
+            booking.billingStatus = "invoiced";
+            await booking.save();
+        }
+
+        if (req.query.format === "pdf") {
+            return generateInvoicePDF(invoice, res);
+        }
+
+        res.json({
+            success: true,
+            invoice
+        });
+
+    } catch (error) {
+        console.error("Invoice Generation Error:", error);
+        res.status(500).json({ success: false, message: "Failed to generate invoice" });
     }
 };

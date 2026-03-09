@@ -190,4 +190,15 @@ router.patch(
  */
 router.get("/", [auth, adminAuth], bookingController.getAllBookings);
 
+/**
+ * @swagger
+ * /api/v1/bookings/{id}/invoice:
+ *   get:
+ *     summary: Generate standard invoice JSON
+ *     tags: [Bookings]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/:id/invoice", auth, bookingController.generateInvoice);
+
 module.exports = router;

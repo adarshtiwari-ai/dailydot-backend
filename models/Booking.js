@@ -19,7 +19,8 @@ const bookingSchema = new mongoose.Schema(
           required: true,
         },
         price: {
-          type: Number,
+          type: Number, // stored in paise/cents
+          set: v => Math.round(v),
           required: true,
         },
         category: {
@@ -56,22 +57,49 @@ const bookingSchema = new mongoose.Schema(
       default: "Pending",
     },
     totalAmount: {
-      type: Number,
+      type: Number, // stored in paise/cents
+      set: v => Math.round(v),
       required: true,
     },
     // Dynamic Invoicing Fields
     baseCost: {
-      type: Number,
+      type: Number, // stored in paise/cents
+      set: v => Math.round(v),
       default: function () { return this.totalAmount; }
     },
+    adjustments: [
+      {
+        reason: { type: String, required: true },
+        amount: { type: Number, set: v => Math.round(v), required: true },
+        addedAt: { type: Date, default: Date.now }
+      }
+    ],
+    taxDetails: {
+      cgst: { type: Number, set: v => Math.round(v), default: 0 },
+      sgst: { type: Number, set: v => Math.round(v), default: 0 },
+      platformFee: { type: Number, set: v => Math.round(v), default: 0 }
+    },
     finalTotal: {
-      type: Number,
-      default: function () { return this.totalAmount; }
+      type: Number, // stored in paise/cents
+      set: v => Math.round(v),
+      default: function () { 
+        const base = this.baseCost || this.totalAmount || 0;
+        const adjustmentsTotal = (this.adjustments || []).reduce((sum, adj) => sum + adj.amount, 0);
+        const cgst = this.taxDetails?.cgst || 0;
+        const sgst = this.taxDetails?.sgst || 0;
+        const platformFee = this.taxDetails?.platformFee || 0;
+        return base + adjustmentsTotal + cgst + sgst + platformFee;
+      }
+    },
+    billingStatus: {
+      type: String,
+      enum: ['quote', 'finalized', 'invoiced'],
+      default: 'quote'
     },
     materials: [
       {
         name: { type: String, required: true },
-        cost: { type: Number, required: true },
+        cost: { type: Number, set: v => Math.round(v), required: true },
         addedAt: { type: Date, default: Date.now }
       }
     ],

@@ -1,5 +1,7 @@
 const Booking = require('../models/Booking');
 const { sendPushNotification } = require('../utils/pushService');
+const { calculateBillDetails } = require('../services/billingService');
+const walletService = require('../services/walletService');
 
 exports.updateBookingStatus = async (req, res) => {
     try {
@@ -95,5 +97,76 @@ exports.addBookingMaterial = async (req, res) => {
     } catch (error) {
         console.error('Error adding booking material:', error);
         res.status(500).json({ success: false, message: 'Server error while adding material' });
+    }
+};
+
+exports.adjustBookingPrice = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { additionalItems } = req.body; // Array of { reason: string, amount: number }
+
+        if (!Array.isArray(additionalItems) || additionalItems.length === 0) {
+            return res.status(400).json({ success: false, message: 'additionalItems must be a non-empty array' });
+        }
+
+        const booking = await Booking.findById(id);
+        if (!booking) {
+            return res.status(404).json({ success: false, message: 'Booking not found' });
+        }
+
+        // Prepare combined adjustments
+        const currentAdjustments = booking.adjustments || [];
+        const combinedAdjustments = [...currentAdjustments, ...additionalItems];
+
+        // Use billingService to recalulate
+        const result = calculateBillDetails(booking.baseCost, combinedAdjustments);
+
+        // Update the Booking document
+        booking.adjustments = combinedAdjustments;
+        booking.taxDetails = {
+            cgst: result.cgst,
+            sgst: result.sgst,
+            platformFee: result.platformFee
+        };
+        booking.finalTotal = result.finalTotal;
+        booking.billingStatus = 'finalized';
+
+        await booking.save();
+
+        // Real-time Sync via Socket.io to the customer (userId)
+        try {
+            const { getIo } = require("../services/socket.service");
+            getIo().to(booking.userId.toString()).emit("bill_updated", {
+                bookingId: booking._id.toString(),
+                newTotal: result.finalTotal,
+                billingStatus: booking.billingStatus,
+                message: "Your bill has been updated with new adjustments."
+            });
+        } catch (err) {
+            console.error("Socket emit failed for bill_updated:", err.message);
+        }
+
+        res.json({ success: true, message: 'Booking price adjusted successfully', booking });
+    } catch (error) {
+        console.error('Error adjusting booking price:', error);
+        res.status(500).json({ success: false, message: error.message || 'Server error while adjusting price' });
+    }
+};
+
+exports.settleProviderDues = async (req, res) => {
+    try {
+        const { id } = req.params; // providerId
+        const { amount } = req.body; // expected in paise
+
+        if (!amount || amount <= 0) {
+            return res.status(400).json({ success: false, message: 'Valid positive amount in paise is required' });
+        }
+
+        const wallet = await walletService.settleDues(id, amount);
+
+        res.json({ success: true, message: 'Provider dues settled successfully', wallet });
+    } catch (error) {
+        console.error('Error settling provider dues:', error);
+        res.status(500).json({ success: false, message: 'Server error while settling dues' });
     }
 };

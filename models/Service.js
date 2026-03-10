@@ -18,6 +18,15 @@ const serviceSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  mrp: {
+    type: Number
+  },
+  inclusions: [{
+    type: String
+  }],
+  exclusions: [{
+    type: String
+  }],
   duration: {
     type: Number,
     default: 60

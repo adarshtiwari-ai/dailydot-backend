@@ -66,9 +66,16 @@ router.get("/", async (req, res) => {
       ];
     }
 
-    const services = await Service.find(query)
-      .populate("category", "name slug tags") // Ensure tags are populated for grouping logic if needed
+    const servicesRaw = await Service.find(query)
+      .populate({
+        path: "category",
+        select: "name slug tags isActive",
+        match: { isActive: true }
+      })
       .sort({ createdAt: -1 });
+
+    // Filter out services where the category was inactive (populated category will be null)
+    const services = servicesRaw.filter(s => s.category !== null);
 
     // Handle Grouping
     if (groupBy === 'tags' && category) {

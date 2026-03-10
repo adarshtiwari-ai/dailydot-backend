@@ -112,6 +112,8 @@ exports.getMyBookings = async (req, res) => {
             .populate("assignedPro", "name phone averageRating totalRatings")
             .sort({ createdAt: -1 });
 
+        console.log('Backend Bookings Found:', bookings.length);
+
         res.json({
             success: true,
             count: bookings.length,

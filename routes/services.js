@@ -506,4 +506,140 @@ router.patch("/:id", [auth, adminAuth], async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/v1/services/{id}/like:
+ *   post:
+ *     summary: Toggle like for a service
+ *     tags: [Services]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Like toggled successfully
+ *       404:
+ *         description: Service not found
+ */
+router.post("/:id/like", auth, async (req, res) => {
+  try {
+    const service = await Service.findById(req.params.id);
+
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: "Service not found",
+      });
+    }
+
+    const userId = req.user.id;
+    const isLiked = service.likes.includes(userId);
+
+    if (isLiked) {
+      service.likes.pull(userId);
+    } else {
+      service.likes.push(userId);
+    }
+
+    await service.save();
+
+    res.json({
+      success: true,
+      likeCount: service.likes.length,
+      isLiked: !isLiked,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to toggle like",
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/v1/services/{id}/comment:
+ *   post:
+ *     summary: Add comment to a service
+ *     tags: [Services]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - text
+ *             properties:
+ *               text:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Comment added successfully
+ *       404:
+ *         description: Service not found
+ */
+router.post(
+  "/:id/comment",
+  [auth, body("text").notEmpty().withMessage("Comment text is required")],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
+      }
+
+      const service = await Service.findById(req.params.id);
+
+      if (!service) {
+        return res.status(404).json({
+          success: false,
+          message: "Service not found",
+        });
+      }
+
+      const newComment = {
+        user: req.user.id,
+        text: req.body.text,
+      };
+
+      service.comments.push(newComment);
+      await service.save();
+
+      // Populate user info for the newly added comment response
+      const populatedService = await Service.findById(req.params.id).populate(
+        "comments.user",
+        "name email profileImage"
+      );
+
+      res.json({
+        success: true,
+        message: "Comment added successfully",
+        comments: populatedService.comments,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: "Failed to add comment",
+      });
+    }
+  }
+);
+
 module.exports = router;

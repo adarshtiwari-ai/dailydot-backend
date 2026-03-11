@@ -108,7 +108,7 @@ exports.createBooking = async (req, res) => {
 exports.getMyBookings = async (req, res) => {
     try {
         const bookings = await Booking.find({ userId: req.user._id })
-            .populate("items.serviceId", "name price duration")
+            .populate("items.serviceId", "name price duration image imageURL imageUrl")
             .populate("assignedPro", "name phone averageRating totalRatings")
             .sort({ createdAt: -1 });
 

@@ -48,11 +48,11 @@ exports.createBooking = async (req, res) => {
             detailedItems.push({
                 serviceId: service._id,
                 name: service.name,
-                price: Math.round(service.price * 100),
+                price: Math.round(service.price),
                 quantity: item.quantity || 1,
             });
 
-            totalAmount += Math.round(service.price * 100) * (item.quantity || 1);
+            totalAmount += Math.round(service.price) * (item.quantity || 1);
         }
 
         // Generate booking number

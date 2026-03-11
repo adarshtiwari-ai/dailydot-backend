@@ -49,7 +49,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // ✅ UPDATED CORS Configuration for React Native
 // ✅ UPDATED CORS Configuration (Status: Allow All for Cloud)
 app.use(cors({
-  origin: ['http://localhost:8081', 'http://localhost:5173', 'http://localhost:3000', 'https://dailydot-api.onrender.com'],
+  origin: ['http://localhost:8081', 'http://localhost:5173', 'http://localhost:3000', 'https://dailydot-admin.vercel.app'],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   credentials: true
 }));

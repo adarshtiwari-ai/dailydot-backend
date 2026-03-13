@@ -1,3 +1,9 @@
+process.on('uncaughtException', (err) => {
+  console.log('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+  console.log(err.name, err.message);
+  process.exit(1);
+});
+
 require("dotenv").config();
 
 // Environment Variable Validation
@@ -21,12 +27,15 @@ const cors = require("cors");
 const path = require("path");
 const helmet = require("helmet");
 const http = require("http");
+const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+
 const connectDB = require("./config/database");
 const { init } = require("./services/socket.service");
 require("./services/event.service");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./config/swagger");
-
 
 const app = express();
 const server = http.createServer(app);
@@ -37,35 +46,52 @@ init(server);
 // Connect to MongoDB
 connectDB();
 
-// Middleware
+// 1) GLOBAL MIDDLEWARES
+// Set security HTTP headers
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
   })
 );
+
+// Limit requests from same API
+const limiter = rateLimit({
+  max: 100, // Limit each IP to 100 requests per `window`
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  message: 'Too many requests from this IP, please try again in 15 minutes!'
+});
+app.use('/api', limiter);
+
+// Body parser, reading data from body into req.body
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
+// Data sanitization against NoSQL query injection
+app.use(mongoSanitize());
+
+// Data sanitization against XSS
+app.use(xss());
+
+// Serving static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-
-// ✅ UPDATED CORS Configuration for React Native
-// ✅ UPDATED CORS Configuration (Status: Allow All for Cloud)
+// CORS Configuration
 app.use(cors({
   origin: ['http://localhost:8081', 'http://localhost:5173', 'http://localhost:3000', 'https://dailydot-admin.vercel.app'],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   credentials: true
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Documentation
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// ✅ Additional CORS headers for preflight requests
 // Request logging
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.path}`);
   next();
 });
 
-// Basic route
+// 2) ROUTES
 app.get("/", (req, res) => {
   res.json({
     message: "DailyDot API is running",
@@ -82,17 +108,14 @@ app.get("/", (req, res) => {
   });
 });
 
-// Health check
 app.get("/health", (req, res) => {
   res.json({
     status: "OK",
-    database:
-      mongoose.connection.readyState === 1 ? "Connected" : "Disconnected",
+    database: mongoose.connection.readyState === 1 ? "Connected" : "Disconnected",
     timestamp: new Date().toISOString(),
   });
 });
 
-// API Routes
 app.use("/api/v1/auth", require("./routes/auth"));
 app.use("/api/v1/users", require("./routes/users"));
 app.use("/api/v1/categories", require("./routes/categories"));
@@ -108,7 +131,7 @@ app.use("/api/v1/professionals", require("./routes/professionals"));
 app.use("/api/v1/admin", require("./routes/admin"));
 app.use("/api/location", require("./routes/location"));
 
-// Error handling middleware
+// 3) ERROR HANDLING
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(err.status || 500).json({
@@ -118,7 +141,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -128,12 +150,18 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-// Use server.listen instead of app.listen for Socket.IO
 server.listen(PORT, "0.0.0.0", () => {
-  // ✅ Listen on all interfaces
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
   console.log("Socket.IO enabled");
   console.log("CORS enabled for React Native development");
   console.log("✅ Reviews & Ratings system enabled");
+});
+
+process.on('unhandledRejection', (err) => {
+  console.log('UNHANDLED REJECTION! 💥 Shutting down...');
+  console.log(err.name, err.message);
+  server.close(() => {
+    process.exit(1);
+  });
 });

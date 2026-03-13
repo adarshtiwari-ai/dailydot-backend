@@ -66,8 +66,21 @@ app.use('/api', limiter);
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
+// Express 5 req.query property override to allow mongoSanitize to work
+app.use((req, res, next) => {
+  Object.defineProperty(req, 'query', {
+    value: { ...req.query },
+    writable: true,
+    enumerable: true,
+    configurable: true
+  });
+  next();
+});
+
 // Data sanitization against NoSQL query injection
-app.use(mongoSanitize());
+app.use(mongoSanitize({
+  replaceWith: '_',
+}));
 
 // Data sanitization against XSS
 app.use(xss());

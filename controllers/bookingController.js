@@ -34,7 +34,7 @@ exports.createBooking = async (req, res) => {
 
         // Process items and calculate total amount securely
         const detailedItems = [];
-        let totalAmount = 0;
+        let itemsSubtotal = 0;
 
         for (const item of items) {
             const service = await Service.findById(item.serviceId);
@@ -52,15 +52,22 @@ exports.createBooking = async (req, res) => {
                 quantity: item.quantity || 1,
             });
 
-            totalAmount += Math.round(service.price) * (item.quantity || 1);
+            itemsSubtotal += Math.round(service.price) * (item.quantity || 1);
         }
+
+        // Centralized Math Engine (Server-Side)
+        const SERVICE_FEE = 5000;
+        const CONVENIENCE_FEE = 2500;
+        const TAX_RATE = 0.18;
+        const taxAmount = Math.round(itemsSubtotal * TAX_RATE);
+        const grandTotal = itemsSubtotal + SERVICE_FEE + CONVENIENCE_FEE + taxAmount;
 
         // Generate booking number
         const date = new Date();
         const random = Math.random().toString(36).substring(2, 8).toUpperCase();
         const bookingNumber = `BK${date.getFullYear()}${random}`;
 
-        // Create booking
+        // Create booking with full breakdown
         const booking = await Booking.create({
             userId: req.user._id,
             items: detailedItems,
@@ -68,7 +75,13 @@ exports.createBooking = async (req, res) => {
             scheduledDate,
             scheduledTime,
             serviceAddress,
-            totalAmount,
+            // Math Engine Fields
+            subtotal: itemsSubtotal,
+            taxAmount,
+            serviceFee: SERVICE_FEE,
+            convenienceFee: CONVENIENCE_FEE,
+            totalAmount: grandTotal, // Saving the real Grand Total
+            baseCost: itemsSubtotal, // Consistency for Invoicing
             name: name || req.user.name,
             phone: phone || req.user.phone,
             notes,

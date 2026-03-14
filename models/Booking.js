@@ -57,9 +57,30 @@ const bookingSchema = new mongoose.Schema(
       default: "Pending",
     },
     totalAmount: {
-      type: Number, // stored in paise/cents
+      type: Number, // stored in paise/cents - This is the GRAND TOTAL
       set: v => Math.round(v),
       required: true,
+    },
+    // Centalized Math Engine Fields
+    subtotal: {
+      type: Number,
+      set: v => Math.round(v),
+      default: 0
+    },
+    taxAmount: {
+      type: Number,
+      set: v => Math.round(v),
+      default: 0
+    },
+    serviceFee: {
+      type: Number,
+      set: v => Math.round(v),
+      default: 5000 // Fixed ₹50.00
+    },
+    convenienceFee: {
+      type: Number,
+      set: v => Math.round(v),
+      default: 2500 // Fixed ₹25.00
     },
     // Dynamic Invoicing Fields
     baseCost: {

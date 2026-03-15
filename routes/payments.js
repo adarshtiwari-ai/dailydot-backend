@@ -14,13 +14,22 @@ module.exports = router;
 */
 const express = require("express");
 const router = express.Router();
+const { auth } = require("../middleware/auth");
+const { createOrder, verifyPayment } = require("../controllers/paymentController");
 
-router.post("/create-order", (req, res) => {
-  res.status(503).json({ message: "Online payments are temporarily disabled." });
-});
+/**
+ * @route   POST /api/v1/payments/create-order
+ * @desc    Create a Razorpay order
+ * @access  Private
+ */
+router.post("/create-order", auth, createOrder);
 
-router.post("/verify", (req, res) => {
-  res.status(503).json({ message: "Online payments are temporarily disabled." });
-});
+/**
+ * @route   POST /api/v1/payments/verify
+ * @desc    Verify Razorpay payment signature
+ * @access  Private
+ */
+router.post("/verify", auth, verifyPayment);
 
 module.exports = router;
+

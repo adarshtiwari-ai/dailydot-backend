@@ -136,10 +136,12 @@ exports.verifyPayment = async (req, res) => {
         booking.paidAt = Date.now();
         await booking.save();
 
+        const updatedBooking = await Booking.findById(booking._id).populate('items.serviceId');
+
         res.status(200).json({
             success: true,
             message: "Payment verified and record updated",
-            bookingId: booking._id
+            booking: updatedBooking
         });
 
     } catch (error) {

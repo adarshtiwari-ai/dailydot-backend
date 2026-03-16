@@ -21,6 +21,10 @@ const serviceSchema = new mongoose.Schema({
   mrp: {
     type: Number
   },
+  isStartingPrice: {
+    type: Boolean,
+    default: false
+  },
   inclusions: [{
     type: String
   }],

@@ -80,9 +80,17 @@ exports.addBookingMaterial = async (req, res) => {
         // Push new material
         booking.materials.push({ name, cost: Number(cost) });
 
-        // Recalculate finalTotal
-        const materialsTotal = booking.materials.reduce((sum, item) => sum + item.cost, 0);
-        booking.finalTotal = booking.baseCost + materialsTotal;
+        // Recalculate true Grand Total including taxes, fees, and adjustments
+        const materialsTotal = booking.materials.reduce((sum, item) => sum + (item.cost || 0), 0);
+        const adjustmentsTotal = (booking.adjustments || []).reduce((sum, item) => sum + (item.amount || 0), 0);
+        
+        booking.finalTotal = 
+            (booking.baseCost || 0) + 
+            (booking.taxAmount || 0) + 
+            (booking.serviceFee || 0) + 
+            (booking.convenienceFee || 0) + 
+            materialsTotal + 
+            adjustmentsTotal;
 
         await booking.save();
 

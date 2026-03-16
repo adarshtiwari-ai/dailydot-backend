@@ -184,3 +184,34 @@ exports.getProviderWallets = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error while fetching wallets' });
     }
 };
+
+exports.broadcastNotification = async (req, res) => {
+    try {
+        const { title, message } = req.body;
+
+        if (!title || !message) {
+            return res.status(400).json({ success: false, message: 'Title and message are required' });
+        }
+
+        // Fetch all users who have a valid push token
+        const users = await User.find({ pushToken: { $exists: true, $ne: '' } }).select('_id');
+        const userIds = users.map(user => user._id);
+
+        if (userIds.length === 0) {
+            return res.status(404).json({ success: false, message: 'No users found with valid push tokens' });
+        }
+
+        // Using the existing sendPushNotification utility
+        const result = await sendPushNotification(userIds, title, message, { type: 'marketing_broadcast' });
+
+        res.json({
+            success: true,
+            count: userIds.length,
+            message: `Broadcasting to ${userIds.length} users...`,
+            details: result
+        });
+    } catch (error) {
+        console.error('Error in broadcastNotification:', error);
+        res.status(500).json({ success: false, message: 'Server error while sending broadcast' });
+    }
+};

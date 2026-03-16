@@ -1,4 +1,5 @@
 const Booking = require('../models/Booking');
+const User = require('../models/User');
 const { sendPushNotification } = require('../utils/pushService');
 const { calculateBillDetails } = require('../services/billingService');
 const walletService = require('../services/walletService');

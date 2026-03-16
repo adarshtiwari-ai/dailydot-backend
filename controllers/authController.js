@@ -311,6 +311,15 @@ exports.updateProfile = async (req, res) => {
     try {
         const { pushToken, phone, name, email } = req.body;
 
+        // --- TOKEN HYGIENE ---
+        if (pushToken) {
+            // Remove this token from any other accounts to enforce 1:1 mapping
+            await User.updateMany(
+                { _id: { $ne: req.user.id || req.user._id }, pushToken: pushToken },
+                { $set: { pushToken: '' } }
+            );
+        }
+
         // Final update to match user's specific template for debugging
         const updatedUser = await User.findByIdAndUpdate(
             req.user.id || req.user._id,

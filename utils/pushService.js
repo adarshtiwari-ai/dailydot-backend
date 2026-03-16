@@ -17,22 +17,28 @@ const sendPushNotification = async (userIds, title, body, data = {}) => {
         // Fetch users and their tokens
         const users = await User.find({ _id: { $in: ids } }).select('+pushToken');
 
-        // Filter out users without valid tokens
-        const messages = [];
-        const tokenToUserMap = {}; // Map tokens back to user IDs for pruning
+        // Extract unique valid tokens
+        const uniqueTokens = [...new Set(
+            users
+                .map(u => u.pushToken)
+                .filter(token => token && Expo.isExpoPushToken(token))
+        )];
 
+        if (uniqueTokens.length === 0) return [];
+
+        const messages = uniqueTokens.map(token => ({
+            to: token,
+            sound: 'default',
+            title: title,
+            body: body,
+            data: data,
+        }));
+
+        // Map tokens to user IDs for pruning (using the first user found for that token)
+        const tokenToUserMap = {};
         for (const user of users) {
-            if (user.pushToken && Expo.isExpoPushToken(user.pushToken)) {
-                messages.push({
-                    to: user.pushToken,
-                    sound: 'default',
-                    title: title,
-                    body: body,
-                    data: data,
-                });
+            if (user.pushToken && !tokenToUserMap[user.pushToken]) {
                 tokenToUserMap[user.pushToken] = user._id;
-            } else {
-                console.log(`Push notification skipped for ${user._id}: No valid token`);
             }
         }
 

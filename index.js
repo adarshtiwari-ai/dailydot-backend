@@ -38,6 +38,7 @@ const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./config/swagger");
 
 const app = express();
+app.set('trust proxy', 1); // Trust Render's reverse proxy for rate-limiting
 const server = http.createServer(app);
 
 // Initialize Socket.IO

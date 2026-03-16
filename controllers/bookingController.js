@@ -587,14 +587,14 @@ exports.generateInvoice = async (req, res) => {
             }
         ];
 
-        if (booking.adjustments && booking.adjustments.length > 0) {
-            booking.adjustments.forEach(adj => {
-                const adjAmount = adj.amount;
-                subtotalPaise += adjAmount;
+        if (booking.materials && booking.materials.length > 0) {
+            booking.materials.forEach(mat => {
+                const matAmount = mat.cost;
+                subtotalPaise += matAmount;
                 lineItems.push({
-                    description: adj.reason,
-                    amount: adjAmount,
-                    date: adj.addedAt
+                    description: `Material: ${mat.name}`,
+                    amount: matAmount,
+                    date: mat.addedAt
                 });
             });
         }

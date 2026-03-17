@@ -131,6 +131,18 @@ const bookingSchema = new mongoose.Schema(
         addedAt: { type: Date, default: Date.now }
       }
     ],
+    appliedFees: [
+      {
+        name: { type: String, required: true },
+        amount: { type: Number, required: true }
+      }
+    ],
+    appliedDiscounts: [
+      {
+        name: { type: String, required: true },
+        amount: { type: Number, required: true }
+      }
+    ],
     // New Professional Reference
     assignedPro: {
       type: mongoose.Schema.Types.ObjectId,

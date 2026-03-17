@@ -56,11 +56,16 @@ exports.createBooking = async (req, res) => {
         }
 
         // Centralized Math Engine (Server-Side)
-        const SERVICE_FEE = 5000;
-        const CONVENIENCE_FEE = 2500;
-        const TAX_RATE = 0.18;
-        const taxAmount = Math.round(itemsSubtotal * TAX_RATE);
-        const grandTotal = itemsSubtotal + SERVICE_FEE + CONVENIENCE_FEE + taxAmount;
+        const { calculateBillDetails } = require("../services/billingService");
+        const billingResult = await calculateBillDetails(itemsSubtotal);
+        const {
+            taxAmount,
+            serviceFee,
+            convenienceFee,
+            finalTotal,
+            appliedFees,
+            appliedDiscounts
+        } = billingResult;
 
         // Generate booking number
         const date = new Date();
@@ -78,9 +83,11 @@ exports.createBooking = async (req, res) => {
             // Math Engine Fields
             subtotal: itemsSubtotal,
             taxAmount,
-            serviceFee: SERVICE_FEE,
-            convenienceFee: CONVENIENCE_FEE,
-            totalAmount: grandTotal, // Saving the real Grand Total
+            serviceFee: serviceFee,
+            convenienceFee: convenienceFee,
+            appliedFees,
+            appliedDiscounts,
+            totalAmount: finalTotal, // Saving the real Grand Total
             baseCost: itemsSubtotal, // Consistency for Invoicing
             name: name || req.user.name,
             phone: phone || req.user.phone,
@@ -629,6 +636,8 @@ exports.generateInvoice = async (req, res) => {
                 cgst: cgstPaise,
                 sgst: sgstPaise,
                 platformFee: platformFeePaise,
+                appliedFees: booking.appliedFees || [],
+                appliedDiscounts: booking.appliedDiscounts || [],
                 grandTotal: grandTotalPaise
             },
             paymentStatus: {

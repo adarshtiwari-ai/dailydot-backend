@@ -79,6 +79,11 @@ const settingSchema = new mongoose.Schema(
             label2: { type: String, default: "Insured" },
             label3: { type: String, default: "Quality Guaranteed" }
         },
+        billing: {
+            defaultTaxRate: { type: Number, default: 0.18 },
+            serviceCharge: { type: Number, default: 50 },
+            convenienceFee: { type: Number, default: 25 }
+        },
         featuredServices: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Service' }]
     },
     { timestamps: true }

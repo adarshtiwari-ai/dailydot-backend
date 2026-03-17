@@ -80,17 +80,19 @@ exports.addBookingMaterial = async (req, res) => {
         // Push new material
         booking.materials.push({ name, cost: Number(cost) });
 
-        // Recalculate true Grand Total including taxes, fees, and adjustments
-        const materialsTotal = booking.materials.reduce((sum, item) => sum + (item.cost || 0), 0);
-        const adjustmentsTotal = (booking.adjustments || []).reduce((sum, item) => sum + (item.amount || 0), 0);
+        // Recalculate true Grand Total using dynamic billing engine
+        const adjustments = booking.adjustments || [];
+        const result = await calculateBillDetails(booking.baseCost, adjustments);
         
-        booking.finalTotal = 
-            (booking.baseCost || 0) + 
-            (booking.taxAmount || 0) + 
-            (booking.serviceFee || 0) + 
-            (booking.convenienceFee || 0) + 
-            materialsTotal + 
-            adjustmentsTotal;
+        // Sync dynamic fields
+        booking.appliedFees = result.appliedFees;
+        booking.appliedDiscounts = result.appliedDiscounts;
+        booking.taxAmount = result.taxAmount;
+        booking.serviceFee = result.serviceFee;
+        booking.convenienceFee = result.convenienceFee;
+
+        const materialsTotal = booking.materials.reduce((sum, item) => sum + (item.cost || 0), 0);
+        booking.finalTotal = result.finalTotal + materialsTotal;
 
         await booking.save();
 
@@ -129,16 +131,28 @@ exports.adjustBookingPrice = async (req, res) => {
         const combinedAdjustments = [...currentAdjustments, ...additionalItems];
 
         // Use billingService to recalulate
-        const result = calculateBillDetails(booking.baseCost, combinedAdjustments);
+        const result = await calculateBillDetails(booking.baseCost, combinedAdjustments);
 
         // Update the Booking document
         booking.adjustments = combinedAdjustments;
+        booking.appliedFees = result.appliedFees;
+        booking.appliedDiscounts = result.appliedDiscounts;
+        
+        // Fees and Taxes
+        booking.taxAmount = result.taxAmount;
+        booking.serviceFee = result.serviceFee;
+        booking.convenienceFee = result.convenienceFee;
+        
         booking.taxDetails = {
             cgst: result.cgst,
             sgst: result.sgst,
             platformFee: result.platformFee
         };
-        booking.finalTotal = result.finalTotal;
+
+        // Recalculate Final Total including materials
+        const materialsTotal = (booking.materials || []).reduce((sum, mat) => sum + (mat.cost || 0), 0);
+        booking.finalTotal = result.finalTotal + materialsTotal;
+        
         booking.billingStatus = 'finalized';
 
         await booking.save();

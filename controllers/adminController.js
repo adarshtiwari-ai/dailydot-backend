@@ -82,7 +82,7 @@ exports.addBookingMaterial = async (req, res) => {
 
         // Recalculate true Grand Total using dynamic billing engine
         const adjustments = booking.adjustments || [];
-        const result = await calculateBillDetails(booking.baseCost, adjustments);
+        const result = await calculateBillDetails(booking.baseCost, adjustments, [], booking.materials);
         
         // Sync dynamic fields
         booking.appliedFees = result.appliedFees;
@@ -90,9 +90,7 @@ exports.addBookingMaterial = async (req, res) => {
         booking.taxAmount = result.taxAmount;
         booking.serviceFee = result.serviceFee;
         booking.convenienceFee = result.convenienceFee;
-
-        const materialsTotal = booking.materials.reduce((sum, item) => sum + (item.cost || 0), 0);
-        booking.finalTotal = result.finalTotal + materialsTotal;
+        booking.finalTotal = result.finalTotal;
 
         await booking.save();
 
@@ -131,7 +129,7 @@ exports.adjustBookingPrice = async (req, res) => {
         const combinedAdjustments = [...currentAdjustments, ...additionalItems];
 
         // Use billingService to recalulate
-        const result = await calculateBillDetails(booking.baseCost, combinedAdjustments);
+        const result = await calculateBillDetails(booking.baseCost, combinedAdjustments, [], booking.materials);
 
         // Update the Booking document
         booking.adjustments = combinedAdjustments;
@@ -149,9 +147,8 @@ exports.adjustBookingPrice = async (req, res) => {
             platformFee: result.platformFee
         };
 
-        // Recalculate Final Total including materials
-        const materialsTotal = (booking.materials || []).reduce((sum, mat) => sum + (mat.cost || 0), 0);
-        booking.finalTotal = result.finalTotal + materialsTotal;
+        // Final Total from dynamic engine
+        booking.finalTotal = result.finalTotal;
         
         booking.billingStatus = 'finalized';
 

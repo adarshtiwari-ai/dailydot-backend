@@ -63,6 +63,15 @@ router.post(
 
 /**
  * @swagger
+ * /api/v1/bookings/calculate:
+ *   post:
+ *     summary: Calculate checkout pricing (SSOT)
+ *     tags: [Bookings]
+ */
+router.post("/calculate", bookingController.calculateCheckoutPricing);
+
+/**
+ * @swagger
  * /api/v1/bookings/my-bookings:
  *   get:
  *     summary: Get user's bookings

@@ -8,9 +8,10 @@ const Discount = require("../models/Discount");
  * @param {number} baseCost - The initial cost of the service.
  * @param {Array<{ amount: number, reason?: string }>} adjustments - Optional array of adjustment objects.
  * @param {Array} items - Optional array of items in the cart to check for applicable discounts.
+ * @param {Array} materials - Optional array of material objects { name: string, cost: number }.
  * @returns {Object} Object containing calculated metrics and dynamic line items.
  */
-const calculateBillDetails = async (baseCost, adjustments = [], items = []) => {
+const calculateBillDetails = async (baseCost, adjustments = [], items = [], materials = []) => {
     if (baseCost < 0) {
         throw new Error("Base cost cannot be negative.");
     }
@@ -23,12 +24,16 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = []) => {
     const convenienceFee = (billing.convenienceFee !== undefined ? billing.convenienceFee : 25) * 100;
     const PLATFORM_FEE_RATE = 0.10;
 
-    let adjustmentsTotal = 0;
-    let appliedDiscounts = [];
-    
-    // 1. Fetch active discounts from the DB
+    // 1. Calculate Materials Total
+    const materialsTotal = (materials || []).reduce((sum, mat) => sum + (Number(mat.cost) || 0), 0);
+
+    // 2. Taxable Subtotal (Base + Materials)
+    const taxableSubtotal = Math.round(baseCost) + materialsTotal;
+
+    // 3. Fetch active discounts from the DB
     const activeDiscounts = await Discount.find({ isActive: true });
     let totalDiscountAmount = 0;
+    let appliedDiscounts = [];
 
     activeDiscounts.forEach(discount => {
         let isApplicable = false;
@@ -37,8 +42,6 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = []) => {
         if (discount.isUniversal) {
             isApplicable = true;
         } else if (items && items.length > 0) {
-            // Check if any item in the cart matches the applicable services for this discount
-            const itemServiceIds = items.map(item => (item.serviceId?._id || item.serviceId || "").toString());
             isApplicable = items.some(item => {
                 const sId = (item.serviceId?._id || item.serviceId || "").toString();
                 return discount.applicableServices.some(appSId => appSId.toString() === sId);
@@ -47,15 +50,16 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = []) => {
 
         if (isApplicable) {
             const discountAmount = discount.type === 'percentage' 
-                ? Math.round(baseCost * (discount.value / 100)) 
-                : discount.value * 100; // Assuming value is in Rupees, convert to Paise
+                ? Math.round(taxableSubtotal * (discount.value / 100)) 
+                : discount.value * 100;
 
             totalDiscountAmount += discountAmount;
             appliedDiscounts.push({ name: discount.name, amount: -discountAmount });
         }
     });
 
-    // 2. Handle manual adjustments (like those from admin dashboard)
+    // 4. Handle manual adjustments
+    let adjustmentsTotal = 0;
     for (const adj of adjustments) {
         adjustmentsTotal += Math.round(adj.amount);
         if (adj.amount < 0) {
@@ -66,15 +70,16 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = []) => {
         }
     }
 
-    const roundedBaseCost = Math.round(baseCost);
-    // Prevent negative subtotals
-    const subtotal = Math.max(0, roundedBaseCost - totalDiscountAmount + adjustmentsTotal);
+    // 5. Discounted Subtotal (for Tax Calculation)
+    // We apply discounts to the taxableSubtotal before tax
+    const discountedSubtotal = Math.max(0, taxableSubtotal - totalDiscountAmount);
 
-    const totalTax = Math.round(subtotal * taxRate);
+    // 6. Calculate Tax based on Discounted Subtotal
+    const totalTax = Math.round(discountedSubtotal * taxRate);
     const cgst = Math.round(totalTax / 2);
     const sgst = totalTax - cgst;
 
-    const platformFee = Math.round(subtotal * PLATFORM_FEE_RATE);
+    const platformFee = Math.round(discountedSubtotal * PLATFORM_FEE_RATE);
 
     const appliedFees = [
         { name: "Service Fee", amount: serviceFee },
@@ -82,10 +87,12 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = []) => {
         { name: "Taxes (GST)", amount: totalTax }
     ];
 
-    const finalTotal = subtotal + serviceFee + convenienceFee + totalTax;
+    // 7. Final Total
+    const finalTotal = discountedSubtotal + serviceFee + convenienceFee + totalTax + adjustmentsTotal;
 
     return {
-        subtotal,
+        subtotal: taxableSubtotal,
+        discountedSubtotal,
         taxAmount: totalTax,
         serviceFee,
         convenienceFee,
@@ -94,6 +101,7 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = []) => {
         platformFee,
         appliedFees,
         appliedDiscounts,
+        materialsTotal,
         finalTotal
     };
 };

@@ -667,3 +667,35 @@ exports.generateInvoice = async (req, res) => {
         res.status(500).json({ success: false, message: "Failed to generate invoice" });
     }
 };
+// @desc    Calculate checkout pricing for SSOT
+// @route   POST /api/v1/bookings/calculate
+// @access  Public
+exports.calculateCheckoutPricing = async (req, res) => {
+    try {
+        const { baseCost, items = [] } = req.body;
+
+        if (baseCost === undefined) {
+             return res.status(400).json({
+                success: false,
+                message: "baseCost is required",
+            });
+        }
+
+        const { calculateBillDetails } = require("../services/billingService");
+        
+        // Use the centralized billing service
+        // Pass baseCost, adjustments (empty), items (for discount check), and materials (empty)
+        const result = await calculateBillDetails(Number(baseCost), [], items, []);
+
+        res.json({
+            success: true,
+            receipt: result
+        });
+    } catch (error) {
+        console.error("Error calculating checkout pricing:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error while calculating pricing",
+        });
+    }
+};

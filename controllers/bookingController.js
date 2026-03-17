@@ -57,7 +57,7 @@ exports.createBooking = async (req, res) => {
 
         // Centralized Math Engine (Server-Side)
         const { calculateBillDetails } = require("../services/billingService");
-        const billingResult = await calculateBillDetails(itemsSubtotal);
+        const billingResult = await calculateBillDetails(itemsSubtotal, [], detailedItems);
         const {
             taxAmount,
             serviceFee,

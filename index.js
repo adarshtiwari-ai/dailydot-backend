@@ -144,6 +144,7 @@ app.use("/api/v1/quick-fixes", require("./routes/quickFix"));
 app.use("/api/v1/professionals", require("./routes/professionals"));
 app.use("/api/v1/admin", require("./routes/admin"));
 app.use("/api/location", require("./routes/location"));
+app.use("/api/v1/discounts", require("./routes/discountRoutes"));
 
 // 3) ERROR HANDLING
 app.use((err, req, res, next) => {

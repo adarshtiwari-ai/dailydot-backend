@@ -1,4 +1,5 @@
 const Setting = require("../models/Setting");
+const Discount = require("../models/Discount");
 
 /**
  * Calculates all billing metrics using integer math (paise/cents).
@@ -6,9 +7,10 @@ const Setting = require("../models/Setting");
  * 
  * @param {number} baseCost - The initial cost of the service.
  * @param {Array<{ amount: number, reason?: string }>} adjustments - Optional array of adjustment objects.
+ * @param {Array} items - Optional array of items in the cart to check for applicable discounts.
  * @returns {Object} Object containing calculated metrics and dynamic line items.
  */
-const calculateBillDetails = async (baseCost, adjustments = []) => {
+const calculateBillDetails = async (baseCost, adjustments = [], items = []) => {
     if (baseCost < 0) {
         throw new Error("Base cost cannot be negative.");
     }
@@ -24,18 +26,49 @@ const calculateBillDetails = async (baseCost, adjustments = []) => {
     let adjustmentsTotal = 0;
     let appliedDiscounts = [];
     
+    // 1. Fetch active discounts from the DB
+    const activeDiscounts = await Discount.find({ isActive: true });
+    let totalDiscountAmount = 0;
+
+    activeDiscounts.forEach(discount => {
+        let isApplicable = false;
+
+        // Check if Universal OR if the cart contains an applicable service
+        if (discount.isUniversal) {
+            isApplicable = true;
+        } else if (items && items.length > 0) {
+            // Check if any item in the cart matches the applicable services for this discount
+            const itemServiceIds = items.map(item => (item.serviceId?._id || item.serviceId || "").toString());
+            isApplicable = items.some(item => {
+                const sId = (item.serviceId?._id || item.serviceId || "").toString();
+                return discount.applicableServices.some(appSId => appSId.toString() === sId);
+            });
+        }
+
+        if (isApplicable) {
+            const discountAmount = discount.type === 'percentage' 
+                ? Math.round(baseCost * (discount.value / 100)) 
+                : discount.value * 100; // Assuming value is in Rupees, convert to Paise
+
+            totalDiscountAmount += discountAmount;
+            appliedDiscounts.push({ name: discount.name, amount: -discountAmount });
+        }
+    });
+
+    // 2. Handle manual adjustments (like those from admin dashboard)
     for (const adj of adjustments) {
         adjustmentsTotal += Math.round(adj.amount);
         if (adj.amount < 0) {
             appliedDiscounts.push({ 
-                name: adj.reason || "Custom Discount", 
+                name: adj.reason || "Custom Adjustment", 
                 amount: adj.amount 
             });
         }
     }
 
     const roundedBaseCost = Math.round(baseCost);
-    const subtotal = roundedBaseCost + adjustmentsTotal;
+    // Prevent negative subtotals
+    const subtotal = Math.max(0, roundedBaseCost - totalDiscountAmount + adjustmentsTotal);
 
     const totalTax = Math.round(subtotal * taxRate);
     const cgst = Math.round(totalTax / 2);

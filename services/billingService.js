@@ -24,60 +24,6 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
     if (taxRate > 1) {
         taxRate = taxRate / 100;
     }
-    const serviceFee = (billing.serviceCharge !== undefined ? billing.serviceCharge : 50) * 100;
-    const convenienceFee = (billing.convenienceFee !== undefined ? billing.convenienceFee : 25) * 100;
-    const PLATFORM_FEE_RATE = 0.10;
-
-    // 1. Calculate Materials Total
-    const materialsTotal = (materials || []).reduce((sum, mat) => sum + (Number(mat.cost) || 0), 0);
-
-    // 2. Taxable Subtotal (Base + Materials)
-    const taxableSubtotal = Math.round(baseCost) + materialsTotal;
-
-    // 3. Fetch active discounts from the DB
-    const activeDiscounts = await Discount.find({ isActive: true });
-    let totalDiscountAmount = 0;
-    let appliedDiscounts = [];
-
-    activeDiscounts.forEach(discount => {
-        let isApplicable = false;
-
-        // Check if Universal OR if the cart contains an applicable service
-        if (discount.isUniversal) {
-            isApplicable = true;
-        } else if (items && items.length > 0) {
-            isApplicable = items.some(item => {
-                const sId = (item.serviceId?._id || item.serviceId || "").toString();
-                return discount.applicableServices.some(appSId => appSId.toString() === sId);
-            });
-        }
-
-        if (isApplicable) {
-            const discountAmount = discount.type === 'percentage' 
-                ? Math.round(taxableSubtotal * (discount.value / 100)) 
-                : discount.value * 100;
-
-            totalDiscountAmount += discountAmount;
-            appliedDiscounts.push({ name: discount.name, amount: -discountAmount });
-        }
-    });
-
-    // 4. Handle manual adjustments
-    let adjustmentsTotal = 0;
-    for (const adj of adjustments) {
-        adjustmentsTotal += Math.round(adj.amount);
-        if (adj.amount < 0) {
-            appliedDiscounts.push({ 
-                name: adj.reason || "Custom Adjustment", 
-                amount: adj.amount 
-            });
-        }
-    }
-
-    // 5. Discounted Subtotal (for Tax Calculation)
-    // We apply discounts to the taxableSubtotal before tax
-    const discountedSubtotal = Math.max(0, taxableSubtotal - totalDiscountAmount);
-
     // 6. Calculate Tax based on Discounted Subtotal
     const totalTax = Math.round(discountedSubtotal * taxRate);
     const cgst = Math.round(totalTax / 2);
@@ -85,21 +31,45 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
 
     const platformFee = Math.round(discountedSubtotal * PLATFORM_FEE_RATE);
 
-    const appliedFees = [
-        { name: "Service Fee", amount: serviceFee },
-        { name: "Convenience Fee", amount: convenienceFee },
-        { name: "Taxes (GST)", amount: totalTax }
-    ];
+    // 7. Calculate Dynamic Global Fees
+    let totalDynamicFees = 0;
+    const appliedFees = [];
+    
+    if (billing.globalFees && billing.globalFees.length > 0) {
+        billing.globalFees.forEach(fee => {
+            if (fee.isActive) {
+                let feeAmount = 0;
+                if (fee.type === 'flat') {
+                    feeAmount = fee.amount * 100; // Convert to paise
+                } else if (fee.type === 'percentage') {
+                    feeAmount = Math.round(taxableSubtotal * (fee.amount / 100));
+                }
+                
+                totalDynamicFees += feeAmount;
+                appliedFees.push({ name: fee.name, amount: feeAmount });
+            }
+        });
+    } else {
+        // FALLBACK: Use legacy fields if globalFees array is empty
+        const legacyServiceFee = (billing.serviceCharge !== undefined ? billing.serviceCharge : 50) * 100;
+        const legacyConvenienceFee = (billing.convenienceFee !== undefined ? billing.convenienceFee : 25) * 100;
+        
+        totalDynamicFees = legacyServiceFee + legacyConvenienceFee;
+        appliedFees.push({ name: "Service Fee", amount: legacyServiceFee });
+        appliedFees.push({ name: "Convenience Fee", amount: legacyConvenienceFee });
+    }
 
-    // 7. Final Total
-    const finalTotal = discountedSubtotal + serviceFee + convenienceFee + totalTax + adjustmentsTotal;
+    // Add Tax to appliedFees
+    appliedFees.push({ name: "Taxes (GST)", amount: totalTax });
+
+    // 8. Final Total
+    const finalTotal = discountedSubtotal + totalTax + totalDynamicFees + adjustmentsTotal;
 
     return {
         subtotal: taxableSubtotal,
         discountedSubtotal,
         taxAmount: totalTax,
-        serviceFee,
-        convenienceFee,
+        totalDynamicFees, // Replaces static fee fields in return object
         cgst,
         sgst,
         platformFee,

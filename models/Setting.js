@@ -82,7 +82,13 @@ const settingSchema = new mongoose.Schema(
         billing: {
             defaultTaxRate: { type: Number, default: 0.18 },
             serviceCharge: { type: Number, default: 50 },
-            convenienceFee: { type: Number, default: 25 }
+            convenienceFee: { type: Number, default: 25 },
+            globalFees: [{
+                name: { type: String, required: true },
+                amount: { type: Number, required: true },
+                type: { type: String, enum: ['flat', 'percentage'], default: 'flat' },
+                isActive: { type: Boolean, default: true }
+            }]
         },
         featuredServices: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Service' }]
     },

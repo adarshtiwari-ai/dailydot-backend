@@ -66,16 +66,11 @@ exports.createBooking = async (req, res) => {
             appliedDiscounts
         } = billingResult;
 
-        // Generate booking number
-        const date = new Date();
-        const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-        const bookingNumber = `BK${date.getFullYear()}${random}`;
 
         // Create booking with full breakdown
         const booking = await Booking.create({
             userId: req.user._id,
             items: detailedItems,
-            bookingNumber,
             scheduledDate,
             scheduledTime,
             serviceAddress,

@@ -12,7 +12,11 @@ const Discount = require("../models/Discount");
  * @returns {Object} Object containing calculated metrics and dynamic line items.
  */
 const calculateBillDetails = async (baseCost, adjustments = [], items = [], materials = []) => {
-    if (baseCost < 0) {
+    // 0. NaN-Proofing & Safe Defaults
+    const safeBaseCost = Number(baseCost) || 0;
+    const safeMaterials = Array.isArray(materials) ? materials : [];
+    
+    if (safeBaseCost < 0) {
         throw new Error("Base cost cannot be negative.");
     }
 
@@ -23,13 +27,13 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
     const PLATFORM_FEE_RATE = 0.10; // 10% platform fee for internal ledger
 
     // 1. Calculate Adjustment Total
-    const adjustmentsTotal = adjustments.reduce((sum, adj) => sum + (adj.amount || 0), 0);
+    const adjustmentsTotal = adjustments.reduce((sum, adj) => sum + (Number(adj.amount) || 0), 0);
 
     // 2. Calculate Materials Total
-    const materialsTotal = materials.reduce((sum, mat) => sum + (mat.cost || 0), 0);
+    const materialsTotal = safeMaterials.reduce((sum, mat) => sum + (Number(mat.cost) || 0), 0);
 
     // 3. Calculate taxableSubtotal (Base + Materials)
-    const taxableSubtotal = baseCost + materialsTotal;
+    const taxableSubtotal = safeBaseCost + materialsTotal;
 
     // 4. Handle Discounts (Placeholder for now, keeping structure)
     const appliedDiscounts = [];
@@ -57,9 +61,9 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
             if (fee.isActive) {
                 let feeAmount = 0;
                 if (fee.type === 'flat') {
-                    feeAmount = fee.amount * 100; // Convert to paise
+                    feeAmount = (Number(fee.amount) || 0) * 100; // Convert to paise
                 } else if (fee.type === 'percentage') {
-                    feeAmount = Math.round(taxableSubtotal * (fee.amount / 100));
+                    feeAmount = Math.round(taxableSubtotal * ((Number(fee.amount) || 0) / 100));
                 }
                 
                 totalDynamicFees += feeAmount;

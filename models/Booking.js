@@ -74,12 +74,12 @@ const bookingSchema = new mongoose.Schema(
     serviceFee: {
       type: Number,
       set: v => Math.round(v),
-      default: 5000 // Fixed ₹50.00
+      default: 0 // Legacy field deprecated
     },
     convenienceFee: {
       type: Number,
       set: v => Math.round(v),
-      default: 2500 // Fixed ₹25.00
+      default: 0 // Legacy field deprecated
     },
     // Dynamic Invoicing Fields
     baseCost: {

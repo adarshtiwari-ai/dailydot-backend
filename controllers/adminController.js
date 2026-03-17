@@ -88,8 +88,7 @@ exports.addBookingMaterial = async (req, res) => {
         booking.appliedFees = result.appliedFees;
         booking.appliedDiscounts = result.appliedDiscounts;
         booking.taxAmount = result.taxAmount;
-        booking.serviceFee = result.serviceFee;
-        booking.convenienceFee = result.convenienceFee;
+        booking.totalAmount = result.finalTotal;
         booking.finalTotal = result.finalTotal;
 
         await booking.save();
@@ -138,8 +137,8 @@ exports.adjustBookingPrice = async (req, res) => {
         
         // Fees and Taxes
         booking.taxAmount = result.taxAmount;
-        booking.serviceFee = result.serviceFee;
-        booking.convenienceFee = result.convenienceFee;
+        // Fees and Taxes
+        booking.taxAmount = result.taxAmount;
         
         booking.taxDetails = {
             cgst: result.cgst,
@@ -148,6 +147,7 @@ exports.adjustBookingPrice = async (req, res) => {
         };
 
         // Final Total from dynamic engine
+        booking.totalAmount = result.finalTotal;
         booking.finalTotal = result.finalTotal;
         
         booking.billingStatus = 'finalized';

@@ -19,7 +19,11 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
     const settings = await Setting.findOne();
     const billing = settings?.billing || {};
     
-    const taxRate = billing.defaultTaxRate !== undefined ? billing.defaultTaxRate : 0.18;
+    let taxRate = billing.defaultTaxRate !== undefined ? billing.defaultTaxRate : 0.18;
+    // Defensive check: if taxRate is percentage (e.g. 18), convert to decimal (0.18)
+    if (taxRate > 1) {
+        taxRate = taxRate / 100;
+    }
     const serviceFee = (billing.serviceCharge !== undefined ? billing.serviceCharge : 50) * 100;
     const convenienceFee = (billing.convenienceFee !== undefined ? billing.convenienceFee : 25) * 100;
     const PLATFORM_FEE_RATE = 0.10;

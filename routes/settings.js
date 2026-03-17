@@ -131,7 +131,7 @@ router.patch("/layout/:section", [auth, adminAuth], async (req, res) => {
 // Update settings
 router.put("/", [auth, adminAuth], async (req, res) => {
     try {
-        const { system, notifications, theme, navigation, homeLayout, safetyShield, featuredServices } = req.body;
+        const { system, notifications, theme, navigation, homeLayout, safetyShield, featuredServices, billing } = req.body;
         let settings = await Setting.findOne();
 
         if (!settings) {
@@ -142,6 +142,10 @@ router.put("/", [auth, adminAuth], async (req, res) => {
         if (system) {
             settings.system = { ...settings.system.toObject(), ...system };
             settings.markModified('system');
+        }
+        if (billing) {
+            settings.billing = { ...settings.billing.toObject(), ...billing };
+            settings.markModified('billing');
         }
         if (notifications) settings.notifications = { ...settings.notifications.toObject(), ...notifications };
         if (theme) settings.theme = { ...settings.theme.toObject(), ...theme };

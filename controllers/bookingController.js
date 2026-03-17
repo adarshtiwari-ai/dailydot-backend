@@ -60,8 +60,7 @@ exports.createBooking = async (req, res) => {
         const billingResult = await calculateBillDetails(itemsSubtotal, [], detailedItems);
         const {
             taxAmount,
-            serviceFee,
-            convenienceFee,
+            totalDynamicFees,
             finalTotal,
             appliedFees,
             appliedDiscounts
@@ -83,8 +82,6 @@ exports.createBooking = async (req, res) => {
             // Math Engine Fields
             subtotal: itemsSubtotal,
             taxAmount,
-            serviceFee: serviceFee,
-            convenienceFee: convenienceFee,
             appliedFees,
             appliedDiscounts,
             totalAmount: finalTotal, // Saving the real Grand Total

@@ -19,12 +19,29 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
     const settings = await Setting.findOne();
     const billing = settings?.billing || {};
     
+    // Constants
+    const PLATFORM_FEE_RATE = 0.10; // 10% platform fee for internal ledger
+
+    // 1. Calculate Adjustment Total
+    const adjustmentsTotal = adjustments.reduce((sum, adj) => sum + (adj.amount || 0), 0);
+
+    // 2. Calculate Materials Total
+    const materialsTotal = materials.reduce((sum, mat) => sum + (mat.cost || 0), 0);
+
+    // 3. Calculate taxableSubtotal (Base + Materials)
+    const taxableSubtotal = baseCost + materialsTotal;
+
+    // 4. Handle Discounts (Placeholder for now, keeping structure)
+    const appliedDiscounts = [];
+    let discountedSubtotal = taxableSubtotal; // Simplified for now
+
+    // 5. Handle Tax Rate
     let taxRate = billing.defaultTaxRate !== undefined ? billing.defaultTaxRate : 0.18;
-    // Defensive check: if taxRate is percentage (e.g. 18), convert to decimal (0.18)
     if (taxRate > 1) {
         taxRate = taxRate / 100;
     }
-    // 6. Calculate Tax based on Discounted Subtotal
+
+    // 6. Calculate Tax
     const totalTax = Math.round(discountedSubtotal * taxRate);
     const cgst = Math.round(totalTax / 2);
     const sgst = totalTax - cgst;
@@ -59,7 +76,7 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
         appliedFees.push({ name: "Convenience Fee", amount: legacyConvenienceFee });
     }
 
-    // Add Tax to appliedFees
+    // Add Tax to appliedFees for visibility
     appliedFees.push({ name: "Taxes (GST)", amount: totalTax });
 
     // 8. Final Total
@@ -69,7 +86,7 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
         subtotal: taxableSubtotal,
         discountedSubtotal,
         taxAmount: totalTax,
-        totalDynamicFees, // Replaces static fee fields in return object
+        totalDynamicFees,
         cgst,
         sgst,
         platformFee,

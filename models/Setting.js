@@ -90,7 +90,18 @@ const settingSchema = new mongoose.Schema(
                 isActive: { type: Boolean, default: true }
             }]
         },
-        featuredServices: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Service' }]
+        featuredServices: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Service' }],
+        splash: {
+            logoUrl: { type: String, default: '' },
+            backgroundColor: { type: String, default: '#0F172A' }
+        },
+        featureFlags: {
+            enableWallet:       { type: Boolean, default: false },
+            enableReferrals:    { type: Boolean, default: false },
+            enableNewUI:        { type: Boolean, default: false },
+            seasonalMode:       { type: Boolean, default: false },
+            enableProviderChat: { type: Boolean, default: false }
+        }
     },
     { timestamps: true }
 );

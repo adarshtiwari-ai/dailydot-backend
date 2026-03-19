@@ -61,7 +61,18 @@ router.get("/app-config", async (req, res) => {
             banners: banners ?? [],
             categories: categories ?? [],
             trending: trendingServices ?? [],
-            maintenance: settings.system?.maintenanceMode || false
+            maintenance: settings.system?.maintenanceMode || false,
+            splash: {
+                logoUrl: settings.splash?.logoUrl || '',
+                backgroundColor: settings.splash?.backgroundColor || '#0F172A'
+            },
+            featureFlags: {
+                enableWallet:       settings.featureFlags?.enableWallet       ?? false,
+                enableReferrals:    settings.featureFlags?.enableReferrals    ?? false,
+                enableNewUI:        settings.featureFlags?.enableNewUI        ?? false,
+                seasonalMode:       settings.featureFlags?.seasonalMode       ?? false,
+                enableProviderChat: settings.featureFlags?.enableProviderChat ?? false
+            }
         };
 
         res.json({
@@ -131,7 +142,7 @@ router.patch("/layout/:section", [auth, adminAuth], async (req, res) => {
 // Update settings
 router.put("/", [auth, adminAuth], async (req, res) => {
     try {
-        const { system, notifications, theme, navigation, homeLayout, safetyShield, featuredServices, billing } = req.body;
+        const { system, notifications, theme, navigation, homeLayout, safetyShield, featuredServices, billing, splash, featureFlags } = req.body;
         let settings = await Setting.findOne();
 
         if (!settings) {
@@ -153,6 +164,14 @@ router.put("/", [auth, adminAuth], async (req, res) => {
         if (homeLayout) settings.homeLayout = homeLayout;
         if (safetyShield) settings.safetyShield = safetyShield;
         if (featuredServices) settings.featuredServices = featuredServices;
+        if (splash) {
+            settings.splash = { ...settings.splash?.toObject(), ...splash };
+            settings.markModified('splash');
+        }
+        if (featureFlags) {
+            settings.featureFlags = { ...settings.featureFlags?.toObject(), ...featureFlags };
+            settings.markModified('featureFlags');
+        }
 
         await settings.save();
 

@@ -74,7 +74,11 @@ router.get("/app-config", async (req, res) => {
                 enableProviderChat: settings.featureFlags?.enableProviderChat ?? false
             },
             homeScreen: {
-                heroBannerUrl: settings.homeScreen?.heroBannerUrl || ''
+                heroBannerUrl: settings.homeScreen?.heroBannerUrl || '',
+                gradientTopColor: settings.homeScreen?.gradientTopColor || 'rgba(0,0,0,0.6)',
+                gradientMidColor: settings.homeScreen?.gradientMidColor || 'transparent',
+                gradientBottomColor: settings.homeScreen?.gradientBottomColor || 'rgba(0,0,0,0.8)',
+                gradientOpacity: settings.homeScreen?.gradientOpacity ?? 1
             }
         };
 

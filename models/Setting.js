@@ -103,7 +103,11 @@ const settingSchema = new mongoose.Schema(
             enableProviderChat: { type: Boolean, default: false }
         },
         homeScreen: {
-            heroBannerUrl: { type: String, default: '' }
+            heroBannerUrl: { type: String, default: '' },
+            gradientTopColor: { type: String, default: 'rgba(0,0,0,0.6)' },
+            gradientMidColor: { type: String, default: 'transparent' },
+            gradientBottomColor: { type: String, default: 'rgba(0,0,0,0.8)' },
+            gradientOpacity: { type: Number, default: 1.0 }
         }
     },
     { timestamps: true }

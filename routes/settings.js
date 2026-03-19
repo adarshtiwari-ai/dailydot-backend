@@ -72,6 +72,9 @@ router.get("/app-config", async (req, res) => {
                 enableNewUI:        settings.featureFlags?.enableNewUI        ?? false,
                 seasonalMode:       settings.featureFlags?.seasonalMode       ?? false,
                 enableProviderChat: settings.featureFlags?.enableProviderChat ?? false
+            },
+            homeScreen: {
+                heroBannerUrl: settings.homeScreen?.heroBannerUrl || ''
             }
         };
 
@@ -142,7 +145,7 @@ router.patch("/layout/:section", [auth, adminAuth], async (req, res) => {
 // Update settings
 router.put("/", [auth, adminAuth], async (req, res) => {
     try {
-        const { system, notifications, theme, navigation, homeLayout, safetyShield, featuredServices, billing, splash, featureFlags } = req.body;
+        const { system, notifications, theme, navigation, homeLayout, safetyShield, featuredServices, billing, splash, featureFlags, homeScreen } = req.body;
         let settings = await Setting.findOne();
 
         if (!settings) {
@@ -171,6 +174,10 @@ router.put("/", [auth, adminAuth], async (req, res) => {
         if (featureFlags) {
             settings.featureFlags = { ...settings.featureFlags?.toObject(), ...featureFlags };
             settings.markModified('featureFlags');
+        }
+        if (homeScreen) {
+            settings.homeScreen = { ...settings.homeScreen?.toObject(), ...homeScreen };
+            settings.markModified('homeScreen');
         }
 
         await settings.save();

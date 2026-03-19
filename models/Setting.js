@@ -101,6 +101,9 @@ const settingSchema = new mongoose.Schema(
             enableNewUI:        { type: Boolean, default: false },
             seasonalMode:       { type: Boolean, default: false },
             enableProviderChat: { type: Boolean, default: false }
+        },
+        homeScreen: {
+            heroBannerUrl: { type: String, default: '' }
         }
     },
     { timestamps: true }

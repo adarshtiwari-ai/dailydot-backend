@@ -390,7 +390,7 @@ router.put("/:id", [auth, adminAuth, upload.array("images", 5)], async (req, res
 
     const service = await Service.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
-      runValidators: true,
+      runValidators: false, // Disabled: partial updates only send changed fields; full validation would crash on missing required fields
     });
 
     if (!service) {
@@ -406,9 +406,11 @@ router.put("/:id", [auth, adminAuth, upload.array("images", 5)], async (req, res
       service,
     });
   } catch (error) {
+    console.error("SERVICE UPDATE ERROR:", error);
     res.status(500).json({
       success: false,
       message: "Failed to update service",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 });

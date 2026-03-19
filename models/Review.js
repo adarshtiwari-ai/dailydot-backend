@@ -157,7 +157,7 @@ reviewSchema.statics.getServiceStats = async function (serviceId) {
   const stats = await this.aggregate([
     {
       $match: {
-        serviceId: mongoose.Types.ObjectId(serviceId),
+        serviceId: new mongoose.Types.ObjectId(serviceId),
         status: "approved",
       },
     },

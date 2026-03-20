@@ -144,7 +144,7 @@ router.post(
         console.log("Files received:", Object.keys(req.files));
       }
 
-      const { name, slug, description, sortOrder, isActive } = req.body;
+      const { name, slug, description, sortOrder, isActive, showOnHome } = req.body;
 
       // Check if category exists
       let category = await Category.findOne({ slug });
@@ -216,8 +216,8 @@ router.post(
         description,
         image: imageUrl,
         imageUrl: imageUrl, // Ensure both are set
-        sortOrder: sortOrder || 0,
         isActive: isActive === "true" || isActive === true,
+        showOnHome: showOnHome === "false" ? false : true,
         tags: tags,
       });
 
@@ -228,6 +228,15 @@ router.post(
       });
     } catch (error) {
       console.error("Create category error:", error);
+      
+      if (error.code === 11000) {
+        const field = Object.keys(error.keyValue)[0];
+        return res.status(400).json({
+          success: false,
+          message: `A category with this ${field} already exists. Please choose a different name.`
+        });
+      }
+
       res.status(500).json({
         success: false,
         message: "Failed to create category",
@@ -292,6 +301,14 @@ router.put("/:id",
 
       const fieldsToUpdate = { ...req.body };
 
+      // Cast boolean strings from FormData
+      if (fieldsToUpdate.isActive !== undefined) {
+        fieldsToUpdate.isActive = fieldsToUpdate.isActive === "true" || fieldsToUpdate.isActive === true;
+      }
+      if (fieldsToUpdate.showOnHome !== undefined) {
+        fieldsToUpdate.showOnHome = fieldsToUpdate.showOnHome === "true" || fieldsToUpdate.showOnHome === true;
+      }
+
       // Handle Image Upload
       if (req.files && req.files.image && req.files.image[0]) {
         try {
@@ -355,6 +372,15 @@ router.put("/:id",
       });
     } catch (error) {
       console.error("Update category error:", error);
+
+      if (error.code === 11000) {
+        const field = Object.keys(error.keyValue)[0];
+        return res.status(400).json({
+          success: false,
+          message: `A category with this ${field} already exists. Please choose a different name.`
+        });
+      }
+
       res.status(500).json({
         success: false,
         message: "Failed to update category",

@@ -31,7 +31,11 @@ const categorySchema = new mongoose.Schema({
   tags: [{
     name: { type: String, required: true },
     icon: { type: String, required: true } // Ionicon name
-  }]
+  }],
+  showOnHome: {
+    type: Boolean,
+    default: true
+  }
 }, {
   timestamps: true,
   toJSON: {

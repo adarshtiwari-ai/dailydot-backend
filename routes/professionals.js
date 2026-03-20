@@ -42,7 +42,7 @@ router.get('/', [auth, adminAuth], async (req, res) => {
 // @access  Private (Admin)
 router.put('/:id', [auth, adminAuth], async (req, res) => {
     try {
-        const { name, isActive } = req.body;
+        const { name, email, bio, photo, isActive } = req.body;
 
         let pro = await Professional.findById(req.params.id);
         if (!pro) {
@@ -50,6 +50,9 @@ router.put('/:id', [auth, adminAuth], async (req, res) => {
         }
 
         if (name) pro.name = name;
+        if (email !== undefined) pro.email = email;
+        if (bio !== undefined) pro.bio = bio;
+        if (photo !== undefined) pro.photo = photo;
         if (typeof isActive !== 'undefined') pro.isActive = isActive;
 
         await pro.save();

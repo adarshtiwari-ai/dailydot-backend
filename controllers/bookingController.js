@@ -2,6 +2,7 @@ const User = require("../models/User");
 const Booking = require("../models/Booking");
 const Professional = require("../models/Professional");
 const Service = require("../models/Service");
+const Review = require("../models/Review");
 const { validationResult } = require("express-validator");
 const eventHub = require("../services/event.service");
 const { generateInvoicePDF } = require("../services/pdfService");
@@ -472,56 +473,38 @@ exports.rateBooking = async (req, res) => {
                 .json({ success: false, message: "Booking already rated" });
         }
 
-        // Update Booking
-        booking.serviceRating = serviceRating;
-        booking.proRating = proRating;
-        booking.comment = comment;
-        booking.isRated = true;
-        await booking.save();
+    // Update Booking status
+    booking.serviceRating = serviceRating;
+    booking.proRating = proRating;
+    booking.comment = comment;
+    booking.isRated = true;
+    await booking.save();
 
-        // Update Service Average Rating
-        if (booking.items && booking.items.length > 0) {
-            const serviceId = booking.items[0].serviceId;
-            const service = await Service.findById(serviceId);
-            if (service) {
-                const newTotalRatings = (service.totalRatings || 0) + 1;
-                const currentTotalScore =
-                    (service.averageRating || 0) * (service.totalRatings || 0);
-                const newAverage =
-                    (currentTotalScore + serviceRating) / newTotalRatings;
-
-                service.totalRatings = newTotalRatings;
-                service.averageRating = newAverage;
-                await service.save();
-            }
-        }
-
-        // Update Professional Average Rating
-        if (booking.assignedPro) {
-            const pro = await Professional.findById(booking.assignedPro);
-            if (pro) {
-                const newTotalRatings = (pro.totalRatings || 0) + 1;
-                const currentTotalScore =
-                    (pro.averageRating || 0) * (pro.totalRatings || 0);
-                const newAverage = (currentTotalScore + proRating) / newTotalRatings;
-
-                pro.totalRatings = newTotalRatings;
-                pro.averageRating = newAverage;
-                await pro.save();
-            }
-        }
-
-        res.json({
-            success: true,
-            message: "Rating submitted successfully",
-            booking,
-        });
-    } catch (error) {
-        console.error("Rating Error:", error);
-        res
-            .status(500)
-            .json({ success: false, message: "Failed to submit rating" });
+    // NEW: Create a standalone Review document (The Single Source of Truth)
+    // This will trigger the post-save hooks in Review.js to update Service/Professional averages
+    if (booking.items && booking.items.length > 0) {
+      await Review.create({
+        bookingId: booking._id,
+        userId: booking.userId,
+        serviceId: booking.items[0].serviceId,
+        providerId: booking.assignedPro, // links to Professional
+        rating: serviceRating,
+        comment: comment,
+        status: "approved", // Auto-approved for verified bookings
+      });
     }
+
+    res.json({
+      success: true,
+      message: "Rating submitted successfully and review generated",
+      booking,
+    });
+  } catch (error) {
+    console.error("Rating Error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to submit rating" });
+  }
 };
 
 // @desc    Get all bookings (Admin only)

@@ -1,4 +1,6 @@
 const mongoose = require("mongoose");
+const Service = require("./Service");
+const Professional = require("./Professional");
 
 const reviewSchema = new mongoose.Schema(
   {
@@ -152,7 +154,7 @@ reviewSchema.methods.getDetailedAverage = function () {
   return (sum / values.length).toFixed(1);
 };
 
-// Static method to get review stats for a service
+// Static method to get review stats for a service (Updated with fix)
 reviewSchema.statics.getServiceStats = async function (serviceId) {
   const stats = await this.aggregate([
     {
@@ -197,6 +199,87 @@ reviewSchema.statics.getServiceStats = async function (serviceId) {
     }
   );
 };
+
+// Static method to calculate and update average ratings (NEW SSOT ENGINE)
+reviewSchema.statics.calcAverageRatings = async function (serviceId, providerId) {
+  try {
+    // 1. Update Service Ratings
+    if (serviceId) {
+      const serviceStats = await this.aggregate([
+        {
+          $match: {
+            serviceId: new mongoose.Types.ObjectId(serviceId),
+            status: "approved",
+          },
+        },
+        {
+          $group: {
+            _id: "$serviceId",
+            nRating: { $sum: 1 },
+            avgRating: { $avg: "$rating" },
+          },
+        },
+      ]);
+
+      if (serviceStats.length > 0) {
+        await Service.findByIdAndUpdate(serviceId, {
+          totalRatings: serviceStats[0].nRating,
+          averageRating: Number(serviceStats[0].avgRating.toFixed(1)),
+        });
+      } else {
+        await Service.findByIdAndUpdate(serviceId, {
+          totalRatings: 0,
+          averageRating: 0,
+        });
+      }
+    }
+
+    // 2. Update Professional Ratings (Provider)
+    if (providerId) {
+      const proStats = await this.aggregate([
+        {
+          $match: {
+            providerId: new mongoose.Types.ObjectId(providerId),
+            status: "approved",
+          },
+        },
+        {
+          $group: {
+            _id: "$providerId",
+            nRating: { $sum: 1 },
+            avgRating: { $avg: "$rating" },
+          },
+        },
+      ]);
+
+      if (proStats.length > 0) {
+        await Professional.findByIdAndUpdate(providerId, {
+          totalRatings: proStats[0].nRating,
+          averageRating: Number(proStats[0].avgRating.toFixed(1)),
+        });
+      } else {
+        await Professional.findByIdAndUpdate(providerId, {
+          totalRatings: 0,
+          averageRating: 0,
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Error calculating average ratings:", error);
+  }
+};
+
+// Middleware: Update ratings after save
+reviewSchema.post("save", function () {
+  this.constructor.calcAverageRatings(this.serviceId, this.providerId);
+});
+
+// Middleware: Update ratings after status change (moderation) or deletion
+reviewSchema.post(/^findOneAnd/, async function (doc) {
+  if (doc) {
+    await doc.constructor.calcAverageRatings(doc.serviceId, doc.providerId);
+  }
+});
 
 // Static method to get overall platform stats
 reviewSchema.statics.getPlatformStats = async function () {

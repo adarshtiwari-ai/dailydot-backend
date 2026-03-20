@@ -61,6 +61,9 @@ const serviceSchema = new mongoose.Schema({
     enum: ['general', 'car_on_wheels', 'decor'],
     default: 'general'
   },
+  searchTags: [{
+    type: String
+  }],
   pricingUnit: {
     type: String,
     enum: ['fixed', 'hourly', 'sq_ft'],

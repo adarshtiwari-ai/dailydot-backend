@@ -18,6 +18,11 @@ router.post('/providers/:id/settle', adminController.settleProviderDues);
 // GET /api/v1/admin/providers/wallets
 router.get('/providers/wallets', auth, adminAuth, adminController.getProviderWallets);
 
+// Provider Details Support
+router.get('/providers/:id', auth, adminAuth, adminController.getProviderProfile);
+router.get('/providers/:id/bookings', auth, adminAuth, adminController.getProviderBookings);
+router.get('/providers/:id/transactions', auth, adminAuth, adminController.getProviderTransactions);
+
 // POST /api/v1/admin/notifications/broadcast
 router.post('/notifications/broadcast', auth, adminAuth, adminController.broadcastNotification);
 

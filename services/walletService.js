@@ -34,6 +34,38 @@ const chargePlatformFee = async (providerId, bookingId, platformFeeAmount) => {
 };
 
 /**
+ * Credit online payout to a provider's wallet.
+ * @param {string|ObjectId} providerId 
+ * @param {string|ObjectId} bookingId 
+ * @param {number} providerCut - In paise
+ */
+const creditOnlinePayout = async (providerId, bookingId, providerCut) => {
+    if (!providerCut || providerCut <= 0) return;
+    const roundedAmount = Math.round(providerCut);
+
+    // Create transaction
+    await WalletTransaction.create({
+        providerId,
+        bookingId,
+        amount: roundedAmount,
+        type: 'ONLINE_PAYOUT_CREDIT',
+        description: `Earnings from online payment for booking ${bookingId}`,
+    });
+
+    // Find and update or create wallet
+    let wallet = await ProviderWallet.findOne({ providerId });
+    if (!wallet) {
+        wallet = new ProviderWallet({ providerId, balance: 0 });
+    }
+
+    // Credit balance
+    wallet.balance += roundedAmount;
+    await wallet.save();
+
+    return wallet;
+};
+
+/**
  * Settle dues for a provider when they pay admin.
  * @param {string|ObjectId} providerId 
  * @param {number} amount - In paise
@@ -63,5 +95,6 @@ const settleDues = async (providerId, amount) => {
 
 module.exports = {
     chargePlatformFee,
+    creditOnlinePayout,
     settleDues,
 };

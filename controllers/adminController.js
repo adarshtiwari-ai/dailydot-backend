@@ -4,6 +4,8 @@ const { sendPushNotification } = require('../utils/pushService');
 const { calculateBillDetails } = require('../services/billingService');
 const walletService = require('../services/walletService');
 const ProviderWallet = require('../models/ProviderWallet');
+const Professional = require('../models/Professional');
+const WalletTransaction = require('../models/WalletTransaction');
 
 exports.updateBookingStatus = async (req, res) => {
     try {
@@ -202,6 +204,55 @@ exports.getProviderWallets = async (req, res) => {
     } catch (error) {
         console.error('Error fetching provider wallets:', error);
         res.status(500).json({ success: false, message: 'Server error while fetching wallets' });
+    }
+};
+
+exports.getProviderProfile = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const professional = await Professional.findById(id);
+        
+        if (!professional) {
+            return res.status(404).json({ success: false, message: 'Provider profile not found' });
+        }
+
+        const wallet = await ProviderWallet.findOne({ providerId: id });
+
+        res.json({ 
+            success: true, 
+            provider: professional,
+            wallet: wallet || { balance: 0, providerId: id }
+        });
+    } catch (error) {
+        console.error('Error fetching provider profile:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+exports.getProviderBookings = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const bookings = await Booking.find({ assignedPro: id })
+            .populate('userId', 'name')
+            .sort({ createdAt: -1 });
+
+        res.json({ success: true, count: bookings.length, bookings });
+    } catch (error) {
+        console.error('Error fetching provider bookings:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+exports.getProviderTransactions = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const transactions = await WalletTransaction.find({ providerId: id })
+            .sort({ createdAt: -1 });
+
+        res.json({ success: true, count: transactions.length, transactions });
+    } catch (error) {
+        console.error('Error fetching provider transactions:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
     }
 };
 

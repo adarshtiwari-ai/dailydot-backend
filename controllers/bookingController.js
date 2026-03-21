@@ -242,6 +242,21 @@ exports.updateBookingStatus = async (req, res) => {
                 booking._id,
                 booking.taxDetails.platformFee
             );
+        } else if (
+            (status === "completed" || status === "Completed") &&
+            (booking.paymentMethod === "online" || booking.paymentMethod === "card" || booking.paymentMethod === "upi") &&
+            booking.paymentStatus === "paid" &&
+            booking.assignedPro
+        ) {
+            // Calculate provider's cut (Grand Total - Platform Fee)
+            const platformFee = booking.taxDetails?.platformFee || 0;
+            const providerCut = (booking.finalTotal || booking.totalAmount) - platformFee;
+
+            await walletService.creditOnlinePayout(
+                booking.assignedPro._id || booking.assignedPro,
+                booking._id,
+                providerCut
+            );
         }
 
         res.json({

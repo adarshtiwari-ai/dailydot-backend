@@ -4,7 +4,7 @@ const providerWalletSchema = new mongoose.Schema(
     {
         providerId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'User', // or Professional based on your exact schema, user requested 'User'
+            ref: 'Professional',
             required: true,
             unique: true,
         },

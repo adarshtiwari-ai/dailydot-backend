@@ -121,7 +121,7 @@ exports.createBooking = async (req, res) => {
 exports.getMyBookings = async (req, res) => {
     try {
         const bookings = await Booking.find({ userId: req.user._id })
-            .populate("items.serviceId", "name price duration image imageURL imageUrl")
+            .populate("items.serviceId", "name price duration image images imageUrl")
             .populate("assignedPro", "name phone averageRating totalRatings")
             .sort({ createdAt: -1 });
 
@@ -146,7 +146,7 @@ exports.getMyBookings = async (req, res) => {
 exports.getBookingById = async (req, res) => {
     try {
         const booking = await Booking.findById(req.params.id)
-            .populate("items.serviceId", "name price duration")
+            .populate("items.serviceId", "name price duration image images imageUrl")
             .populate("userId", "name email phone")
             .populate("assignedPro", "name phone averageRating totalRatings");
 
@@ -514,7 +514,7 @@ exports.getAllBookings = async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 0;
         const bookings = await Booking.find()
-            .populate("items.serviceId", "name price")
+            .populate("items.serviceId", "name price duration image images imageUrl")
             .populate("userId", "name phone email")
             .populate("assignedPro", "name phone averageRating totalRatings")
             .sort({ createdAt: -1 })

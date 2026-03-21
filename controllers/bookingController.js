@@ -193,7 +193,7 @@ exports.updateBookingStatus = async (req, res) => {
             });
         }
 
-        const { status, proName, proPhone } = req.body;
+        const { status, proName, proPhone, materialCost, adminCommission } = req.body;
         let assignedProId = null;
 
         // Logic for Assigning Professional on Confirmation
@@ -215,6 +215,17 @@ exports.updateBookingStatus = async (req, res) => {
             updateData.assignedPro = assignedProId;
         }
 
+        // Settlement Data for Completion
+        if (status === "completed" || status === "Completed") {
+            const safeMaterialCost = Number(materialCost) || 0;
+            const safeAdminCommission = Number(adminCommission) || 0;
+            
+            updateData.materialCost = safeMaterialCost;
+            updateData.adminCommission = safeAdminCommission;
+            updateData.netPlatformProfit = safeAdminCommission;
+            updateData.isSettled = true;
+        }
+
         const booking = await Booking.findByIdAndUpdate(
             req.params.id,
             { $set: updateData },
@@ -228,35 +239,42 @@ exports.updateBookingStatus = async (req, res) => {
             });
         }
 
-        // Provider Debt Ledger Hook
+        // Provider Debt Ledger Hook (Updated for MANUAL SETTLEMENT)
         if (
             (status === "completed" || status === "Completed") &&
-            (booking.paymentMethod === "cod" || booking.paymentMethod === "cash") &&
-            booking.billingStatus === "invoiced" &&
-            booking.taxDetails &&
-            booking.taxDetails.platformFee > 0 &&
             booking.assignedPro
         ) {
-            await walletService.chargePlatformFee(
-                booking.assignedPro._id || booking.assignedPro,
-                booking._id,
-                booking.taxDetails.platformFee
-            );
-        } else if (
-            (status === "completed" || status === "Completed") &&
-            (booking.paymentMethod === "online" || booking.paymentMethod === "card" || booking.paymentMethod === "upi") &&
-            booking.paymentStatus === "paid" &&
-            booking.assignedPro
-        ) {
-            // Calculate provider's cut (Grand Total - Platform Fee)
-            const platformFee = booking.taxDetails?.platformFee || 0;
-            const providerCut = (booking.finalTotal || booking.totalAmount) - platformFee;
+            const totalToSplit = booking.finalTotal || booking.totalAmount || 0;
+            const mCost = booking.materialCost || 0;
+            const aComm = booking.adminCommission || 0;
+            
+            // The split: Provider Payout = Total - Materials - Commission
+            const providerPayout = totalToSplit - mCost - aComm;
 
-            await walletService.creditOnlinePayout(
-                booking.assignedPro._id || booking.assignedPro,
-                booking._id,
-                providerCut
-            );
+            if (booking.paymentMethod === "cod" || booking.paymentMethod === "cash") {
+                // For COD, the provider already has the cash. 
+                // Platform take-home = Total - Payout = Materials + Commission.
+                // We charge the provider for the platform's share.
+                const platformTakeHome = totalToSplit - providerPayout;
+                
+                if (platformTakeHome > 0) {
+                    await walletService.chargePlatformFee(
+                        booking.assignedPro._id || booking.assignedPro,
+                        booking._id,
+                        platformTakeHome
+                    );
+                }
+            } else {
+                // For Online payments, platform has the cash. 
+                // We credit the provider their specific payout.
+                if (providerPayout > 0) {
+                    await walletService.creditOnlinePayout(
+                        booking.assignedPro._id || booking.assignedPro,
+                        booking._id,
+                        providerPayout
+                    );
+                }
+            }
         }
 
         res.json({

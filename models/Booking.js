@@ -142,6 +142,23 @@ const bookingSchema = new mongoose.Schema(
         amount: { type: Number, required: true }
       }
     ],
+    // Financial Settlement Fields
+    materialCost: {
+      type: Number,
+      default: 0
+    },
+    adminCommission: {
+      type: Number,
+      default: 0
+    },
+    netPlatformProfit: {
+      type: Number,
+      default: 0
+    },
+    isSettled: {
+      type: Boolean,
+      default: false
+    },
     // New Professional Reference
     assignedPro: {
       type: mongoose.Schema.Types.ObjectId,

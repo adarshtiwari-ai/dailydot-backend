@@ -11,6 +11,13 @@ const chargePlatformFee = async (providerId, bookingId, platformFeeAmount) => {
     if (!platformFeeAmount || platformFeeAmount <= 0) return;
     const roundedAmount = Math.round(platformFeeAmount);
 
+    // Idempotency Guard: Prevent duplicate platform fee deduction for the same booking
+    const existingDebit = await WalletTransaction.findOne({ bookingId, type: 'COMMISSION_DEBIT' });
+    if (existingDebit) {
+        console.log(`[WalletService] COMMISSION_DEBIT already exists for booking ${bookingId}. Skipping.`);
+        return;
+    }
+
     // Create transaction
     await WalletTransaction.create({
         providerId,
@@ -42,6 +49,13 @@ const chargePlatformFee = async (providerId, bookingId, platformFeeAmount) => {
 const creditOnlinePayout = async (providerId, bookingId, providerCut) => {
     if (!providerCut || providerCut <= 0) return;
     const roundedAmount = Math.round(providerCut);
+
+    // Idempotency Guard: Prevent duplicate online payout credit for the same booking
+    const existingCredit = await WalletTransaction.findOne({ bookingId, type: 'ONLINE_PAYOUT_CREDIT' });
+    if (existingCredit) {
+        console.log(`[WalletService] ONLINE_PAYOUT_CREDIT already exists for booking ${bookingId}. Skipping.`);
+        return;
+    }
 
     // Create transaction
     await WalletTransaction.create({

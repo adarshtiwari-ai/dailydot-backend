@@ -288,6 +288,9 @@ router.post(
   ],
   async (req, res) => {
     try {
+      if (req.body.tagId === "") {
+        req.body.tagId = null;
+      }
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({
@@ -368,6 +371,9 @@ router.post(
  */
 router.put("/:id", [auth, adminAuth, upload.array("images", 5)], async (req, res) => {
   try {
+    if (req.body.tagId === "") {
+      req.body.tagId = null;
+    }
     // Handle image upload
     if (req.files && req.files.length > 0) {
       try {
@@ -484,6 +490,9 @@ router.delete("/:id", [auth, adminAuth], async (req, res) => {
  */
 router.patch("/:id", [auth, adminAuth], async (req, res) => {
   try {
+    if (req.body.tagId === "") {
+      req.body.tagId = null;
+    }
     const service = await Service.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true,

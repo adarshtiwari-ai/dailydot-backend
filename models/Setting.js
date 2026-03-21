@@ -107,7 +107,8 @@ const settingSchema = new mongoose.Schema(
             gradientTopColor: { type: String, default: 'rgba(0,0,0,0.6)' },
             gradientMidColor: { type: String, default: 'transparent' },
             gradientBottomColor: { type: String, default: 'rgba(0,0,0,0.8)' },
-            gradientOpacity: { type: Number, default: 1.0 }
+            gradientOpacity: { type: Number, default: 1.0 },
+            heroBanners: [{ type: String }]
         }
     },
     { timestamps: true }

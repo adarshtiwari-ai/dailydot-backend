@@ -193,7 +193,7 @@ exports.updateBookingStatus = async (req, res) => {
             });
         }
 
-        const { status, proName, proPhone, materialCost, adminCommission } = req.body;
+        const { status, proName, proPhone, materialCost, adminCommission, taxAmount } = req.body;
         let assignedProId = null;
 
         // Logic for Assigning Professional on Confirmation
@@ -223,6 +223,7 @@ exports.updateBookingStatus = async (req, res) => {
             updateData.materialCost = safeMaterialCost;
             updateData.adminCommission = safeAdminCommission;
             updateData.netPlatformProfit = safeAdminCommission;
+            updateData.taxAmount = Number(taxAmount) || 0;
             updateData.isSettled = true;
         }
 

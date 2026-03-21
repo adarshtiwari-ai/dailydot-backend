@@ -239,6 +239,14 @@ exports.updateBookingStatus = async (req, res) => {
             });
         }
 
+        // Validation: Cannot complete/settle without an assigned professional
+        if ((status === 'completed' || status === 'Completed') && !booking.assignedPro) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Cannot complete and settle a booking without an assigned professional.' 
+            });
+        }
+
         // Provider Debt Ledger Hook (Updated for MANUAL SETTLEMENT)
         if (
             (status === "completed" || status === "Completed") &&

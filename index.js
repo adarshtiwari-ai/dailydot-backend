@@ -26,6 +26,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
 const helmet = require("helmet");
+const compression = require("compression");
 const http = require("http");
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
@@ -48,6 +49,9 @@ init(server);
 connectDB();
 
 // 1) GLOBAL MIDDLEWARES
+// Compress responses
+app.use(compression());
+
 // Set security HTTP headers
 app.use(
   helmet({

@@ -8,7 +8,8 @@ const serviceSchema = new mongoose.Schema({
   category: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
-    required: true
+    required: true,
+    index: true
   },
   description: {
     type: String,
@@ -42,7 +43,8 @@ const serviceSchema = new mongoose.Schema({
   },
   isActive: {
     type: Boolean,
-    default: true
+    default: true,
+    index: true
   },
   tagId: {
     type: mongoose.Schema.Types.ObjectId,

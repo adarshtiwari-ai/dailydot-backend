@@ -6,12 +6,14 @@ let io;
 const init = (server) => {
     io = socketIo(server, {
         cors: {
-            origin: ["https://dailydot-admin.vercel.app", "http://localhost:5173", "http://localhost:3000"],
+            origin: ["https://dailydot-admin.vercel.app", "http://localhost:5173"],
             methods: ["GET", "POST"],
             credentials: true,
         },
         transports: ["polling", "websocket"],
         allowEIO3: true,
+        pingTimeout: 60000,
+        pingInterval: 25000,
     });
 
     io.on("connection", (socket) => {

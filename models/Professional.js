@@ -39,6 +39,17 @@ const professionalSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    location: {
+        type: {
+            type: String,
+            enum: ['Point'],
+            default: 'Point'
+        },
+        coordinates: {
+            type: [Number],
+            default: [0, 0]
+        }
+    },
     createdAt: {
         type: Date,
         default: Date.now
@@ -46,5 +57,8 @@ const professionalSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+// Add 2dsphere index for geospatial queries
+professionalSchema.index({ location: "2dsphere" });
 
 module.exports = mongoose.model('Professional', professionalSchema);

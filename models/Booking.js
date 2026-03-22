@@ -6,6 +6,7 @@ const bookingSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
     },
     items: [
       {
@@ -54,6 +55,7 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       enum: ["Pending", "Confirmed", "Completed", "Cancelled", "pending", "confirmed", "assigned", "on_the_way", "in_progress", "completed", "cancelled"],
       default: "Pending",
+      index: true,
     },
     totalAmount: {
       type: Number, // stored in paise/cents - This is the GRAND TOTAL

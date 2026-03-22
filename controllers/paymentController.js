@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const razorpay = require("../config/razorpay");
 const Booking = require("../models/Booking");
 const { validationResult } = require("express-validator");
+const eventHub = require("../services/event.service");
 
 /**
  * @desc    Create a Razorpay order
@@ -142,6 +143,12 @@ exports.verifyPayment = async (req, res) => {
             success: true,
             message: "Payment verified and record updated",
             booking: updatedBooking
+        });
+
+        // Emit BOOKING_CREATED event globally
+        eventHub.emit("BOOKING_CREATED", {
+            booking: updatedBooking,
+            user: updatedBooking.userId,
         });
 
     } catch (error) {

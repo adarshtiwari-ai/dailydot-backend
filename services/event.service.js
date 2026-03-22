@@ -1,6 +1,7 @@
 const EventEmitter = require('events');
 const notificationService = require('./notification.service');
 const { sendPushNotification } = require('../utils/pushService');
+const { getIo } = require('./socket.service');
 
 /**
  * Event Hub for decoupled notification logic.
@@ -23,6 +24,13 @@ eventHub.on('BOOKING_CREATED', async (data) => {
             booking,
             user
         });
+
+        // Real-time socket notification for Admin Dashboard
+        try {
+            getIo().emit('new-booking', booking);
+        } catch (err) {
+            console.error("[EventHub] Socket emit failed:", err.message);
+        }
     } catch (error) {
         console.error("[EventHub] Error in BOOKING_CREATED listener:", error);
     }

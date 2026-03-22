@@ -1,6 +1,43 @@
 const Booking = require("../models/Booking");
 const User = require("../models/User");
 const Service = require("../models/Service");
+const Professional = require("../models/Professional");
+
+exports.getDashboardAnalytics = async (req, res) => {
+  try {
+    const [bookingStats, userCount, providerCount] = await Promise.all([
+      Booking.aggregate([
+        { 
+          $match: { 
+            status: { $regex: /^completed$/i } 
+          } 
+        },
+        { 
+          $group: { 
+            _id: null, 
+            totalGMV: { $sum: '$finalTotal' }, 
+            totalProfit: { $sum: '$netPlatformProfit' } 
+          } 
+        }
+      ]),
+      User.countDocuments({ role: 'user' }),
+      Professional.countDocuments()
+    ]);
+
+    const stats = bookingStats.length > 0 ? bookingStats[0] : { totalGMV: 0, totalProfit: 0 };
+
+    res.json({
+      success: true,
+      totalGMV: stats.totalGMV,
+      totalProfit: stats.totalProfit,
+      userCount,
+      providerCount
+    });
+  } catch (error) {
+    console.error("Error fetching dashboard analytics:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
 exports.getMetrics = async (req, res) => {
   try {

@@ -7,6 +7,7 @@ const { auth, adminAuth } = require("../middleware/auth");
 router.use(auth);
 router.use(adminAuth);
 
+router.get("/overview", analyticsController.getDashboardAnalytics);
 router.get("/metrics", analyticsController.getMetrics);
 router.get("/revenue", analyticsController.getRevenueChart);
 router.get("/services-distribution", analyticsController.getServiceDistribution);

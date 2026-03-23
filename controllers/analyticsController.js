@@ -5,11 +5,39 @@ const Professional = require("../models/Professional");
 
 exports.getDashboardAnalytics = async (req, res) => {
   try {
-    const [bookingStats, userCount, providerCount] = await Promise.all([
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+    const sixtyDaysAgo = new Date(now.getTime() - (60 * 24 * 60 * 60 * 1000));
+
+    const [
+      bookingStats,
+      prevBookingStats,
+      userCount,
+      prevUserCount,
+      providerCount
+    ] = await Promise.all([
+      // Current 30 days stats
       Booking.aggregate([
         { 
           $match: { 
-            status: { $regex: /^completed$/i } 
+            status: { $regex: /^completed$/i },
+            createdAt: { $gte: thirtyDaysAgo }
+          } 
+        },
+        { 
+          $group: { 
+            _id: null, 
+            totalGMV: { $sum: '$finalTotal' }, 
+            totalProfit: { $sum: '$netPlatformProfit' } 
+          } 
+        }
+      ]),
+      // Previous 30 days stats (for growth math)
+      Booking.aggregate([
+        { 
+          $match: { 
+            status: { $regex: /^completed$/i },
+            createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo }
           } 
         },
         { 
@@ -21,17 +49,39 @@ exports.getDashboardAnalytics = async (req, res) => {
         }
       ]),
       User.countDocuments({ role: 'user' }),
+      User.countDocuments({ role: 'user', createdAt: { $lt: thirtyDaysAgo } }),
       Professional.countDocuments()
     ]);
 
     const stats = bookingStats.length > 0 ? bookingStats[0] : { totalGMV: 0, totalProfit: 0 };
+    const prevStats = prevBookingStats.length > 0 ? prevBookingStats[0] : { totalGMV: 0, totalProfit: 0 };
+
+    // Growth calculation helper with safety for division by zero
+    const calculateGrowth = (current, previous) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return ((current - previous) / previous) * 100;
+    };
+
+    const gmvGrowth = calculateGrowth(stats.totalGMV, prevStats.totalGMV);
+    const profitGrowth = calculateGrowth(stats.totalProfit, prevStats.totalProfit);
+    
+    // User growth: Compare new users in last 30 days vs total before that?
+    // Or users in last 30 vs users in 30-60. Let's do new users in periods.
+    const currentNewUsers = userCount - prevUserCount;
+    // For previous new users, we'd need another count. Let's simplify and compare total population growth.
+    const userGrowth = calculateGrowth(userCount, prevUserCount);
 
     res.json({
       success: true,
       totalGMV: stats.totalGMV,
       totalProfit: stats.totalProfit,
       userCount,
-      providerCount
+      providerCount,
+      growth: {
+        gmv: parseFloat(gmvGrowth.toFixed(1)),
+        profit: parseFloat(profitGrowth.toFixed(1)),
+        users: parseFloat(userGrowth.toFixed(1))
+      }
     });
   } catch (error) {
     console.error("Error fetching dashboard analytics:", error);

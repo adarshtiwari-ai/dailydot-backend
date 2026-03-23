@@ -4,6 +4,7 @@ const Banner = require("../models/Banner");
 const Category = require("../models/Category");
 const Service = require("../models/Service");
 const { auth, adminAuth } = require("../middleware/auth");
+const { getIo } = require("../services/socket.service");
 
 const router = express.Router();
 
@@ -75,13 +76,14 @@ router.get("/app-config", async (req, res) => {
             },
             homeScreen: {
                 heroBannerUrl: settings.homeScreen?.heroBannerUrl || '',
-                gradientTopColor: settings.homeScreen?.gradientTopColor || 'rgba(0,0,0,0.6)',
+                gradientTopColor: settings.homeScreen?.heroBannerUrl ? 'rgba(0,0,0,0.6)' : 'transparent',
                 gradientMidColor: settings.homeScreen?.gradientMidColor || 'transparent',
                 gradientBottomColor: settings.homeScreen?.gradientBottomColor || 'rgba(0,0,0,0.8)',
                 gradientOpacity: settings.homeScreen?.gradientOpacity ?? 1,
                 heroBanners: settings.homeScreen?.heroBanners || []
             },
-            billing: settings.billing || { defaultTaxRate: 0.18, serviceCharge: 50, convenienceFee: 25 }
+            billing: settings.billing || { defaultTaxRate: 0.18, serviceCharge: 50, convenienceFee: 25 },
+            activeMapProvider: settings.system?.activeMapProvider || 'google'
         };
 
         res.json({
@@ -217,6 +219,12 @@ router.put("/map-provider", [auth, adminAuth], async (req, res) => {
 
         settings.system.activeMapProvider = provider;
         await settings.save();
+
+        // Emit socket event for real-time mobile update
+        const io = getIo();
+        if (io) {
+            io.emit('map-provider-changed', { provider });
+        }
 
         res.json({
             success: true,

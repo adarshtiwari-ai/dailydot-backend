@@ -5,6 +5,9 @@ const Category = require("../models/Category");
 const Service = require("../models/Service");
 const { auth, adminAuth } = require("../middleware/auth");
 const { getIo } = require("../services/socket.service");
+const upload = require('../middleware/upload');
+const cloudinary = require('../config/cloudinary');
+const fs = require('fs');
 
 const router = express.Router();
 
@@ -147,6 +150,44 @@ router.patch("/layout/:section", [auth, adminAuth], async (req, res) => {
     } catch (error) {
         console.error("Patch layout error:", error);
         res.status(500).json({ success: false, message: "Update failed" });
+    }
+});
+
+// Upload Mascot Image
+router.put("/mascot", [auth, adminAuth, upload.single("image")], async (req, res) => {
+    try {
+        let settings = await Setting.findOne();
+        if (!settings) settings = new Setting();
+
+        if (req.file) {
+            try {
+                const result = await cloudinary.uploader.upload(req.file.path, {
+                    folder: "settings",
+                });
+                
+                if (!settings.homeScreen) settings.homeScreen = {};
+                settings.homeScreen.homeScreenMascotUrl = result.secure_url;
+                settings.markModified('homeScreen');
+                
+                await settings.save();
+                if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+
+                return res.json({
+                    success: true,
+                    message: "Mascot updated successfully",
+                    data: { homeScreenMascotUrl: settings.homeScreen.homeScreenMascotUrl }
+                });
+            } catch (error) {
+                console.error("Cloudinary upload error (mascot):", error);
+                if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+                return res.status(500).json({ success: false, message: "Error uploading image to Cloudinary" });
+            }
+        } else {
+            return res.status(400).json({ success: false, message: "No image file provided" });
+        }
+    } catch (error) {
+        console.error("Mascot upload error:", error);
+        res.status(500).json({ success: false, message: "Failed to upload mascot" });
     }
 });
 

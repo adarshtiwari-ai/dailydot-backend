@@ -84,7 +84,7 @@ router.get("/app-config", async (req, res) => {
                 gradientBottomColor: settings.homeScreen?.gradientBottomColor || 'rgba(0,0,0,0.8)',
                 gradientOpacity: settings.homeScreen?.gradientOpacity ?? 1,
                 heroBanners: settings.homeScreen?.heroBanners || [],
-                homeScreenMascotUrl: settings.homeScreen?.homeScreenMascotUrl ? settings.homeScreen.homeScreenMascotUrl.replace('/upload/', '/upload/f_auto,q_auto,w_600/') : ''
+                homeScreenMascotUrl: settings.homeScreen?.homeScreenMascotUrl ? settings.homeScreen.homeScreenMascotUrl.replace('/upload/', '/upload/f_auto,q_auto,w_1200/') : ''
             },
             billing: settings.billing || { defaultTaxRate: 0.18, serviceCharge: 50, convenienceFee: 25 },
             activeMapProvider: settings.system?.activeMapProvider || 'google'

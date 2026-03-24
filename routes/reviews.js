@@ -146,6 +146,7 @@ router.post(
         bookingId,
         userId: req.user._id,
         serviceId: booking.serviceId,
+        providerId: booking.assignedPro,
         rating,
         comment,
         detailedRatings,
@@ -171,6 +172,46 @@ router.post(
     }
   }
 );
+
+/**
+ * @swagger
+ * /api/v1/reviews/provider/{providerId}:
+ *   get:
+ *     summary: Get reviews for a specific professional
+ *     tags: [Reviews]
+ *     parameters:
+ *       - in: path
+ *         name: providerId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Professional reviews retrieved successfully
+ *       500:
+ *         description: Server error
+ */
+router.get("/provider/:providerId", async (req, res) => {
+  try {
+    const { providerId } = req.params;
+    const reviews = await Review.find({ providerId, status: "approved" })
+      .populate("userId", "name profileImage avatar")
+      .populate("serviceId", "name")
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: reviews.length,
+      reviews,
+    });
+  } catch (error) {
+    console.error("Get provider reviews error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch professional reviews",
+    });
+  }
+});
 
 /**
  * @swagger

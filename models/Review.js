@@ -20,6 +20,11 @@ const reviewSchema = new mongoose.Schema(
       ref: "Service",
       required: true,
     },
+    providerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Professional",
+      required: false,
+    },
     rating: {
       type: Number,
       required: true,

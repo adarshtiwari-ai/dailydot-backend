@@ -148,7 +148,7 @@ router.post(
       const review = await Review.create({
         bookingId,
         userId: req.user._id,
-        serviceId: booking.serviceId,
+        serviceId: serviceId || booking.serviceId || booking.service,
         providerId: booking.assignedPro,
         serviceRating,
         providerRating,

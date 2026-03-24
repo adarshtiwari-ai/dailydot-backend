@@ -144,8 +144,8 @@ router.post(
         });
       }
 
-      // Bulletproof extraction: Check populated _id, direct service field, or serviceId field
-      const extractedServiceId = serviceId || booking.service?._id || booking.service || booking.serviceId;
+      // Safely extract from the items array
+      const extractedServiceId = serviceId || booking.items?.[0]?.serviceId || booking.items?.[0]?._id;
       const extractedProviderId = booking.assignedPro?._id || booking.assignedPro || booking.providerId;
 
       // Create review

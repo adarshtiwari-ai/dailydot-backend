@@ -161,6 +161,11 @@ router.post(
         images: images || [],
       });
 
+      booking.isRated = true;
+      booking.serviceRating = serviceRating;
+      booking.proRating = providerRating;
+      await booking.save();
+
       const populatedReview = await Review.findById(review._id)
         .populate("userId", "name email")
         .populate("serviceId", "name")

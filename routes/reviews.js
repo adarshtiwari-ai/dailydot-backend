@@ -144,12 +144,16 @@ router.post(
         });
       }
 
+      // Bulletproof extraction: Check populated _id, direct service field, or serviceId field
+      const extractedServiceId = serviceId || booking.service?._id || booking.service || booking.serviceId;
+      const extractedProviderId = booking.assignedPro?._id || booking.assignedPro || booking.providerId;
+
       // Create review
       const review = await Review.create({
         bookingId,
         userId: req.user._id,
-        serviceId: serviceId || booking.serviceId || booking.service,
-        providerId: booking.assignedPro,
+        serviceId: extractedServiceId,
+        providerId: extractedProviderId,
         serviceRating,
         providerRating,
         comment,

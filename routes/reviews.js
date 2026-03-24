@@ -66,9 +66,12 @@ router.post(
   auth,
   [
     // Validation: Make bookingId optional here, check inside
-    body("rating")
+    body("serviceRating")
       .isInt({ min: 1, max: 5 })
-      .withMessage("Rating must be between 1 and 5"),
+      .withMessage("Service Rating must be between 1 and 5"),
+    body("providerRating")
+      .isInt({ min: 1, max: 5 })
+      .withMessage("Provider Rating must be between 1 and 5"),
     body("comment")
       .isLength({ min: 10, max: 1000 })
       .withMessage("Comment must be between 10 and 1000 characters"),
@@ -83,7 +86,7 @@ router.post(
         });
       }
 
-      let { bookingId, serviceId, rating, comment, detailedRatings, images } = req.body;
+      let { bookingId, serviceId, serviceRating, providerRating, comment, detailedRatings, images } = req.body;
       console.log("Create Review Request Body:", req.body); // Debug Log
       console.log("User:", req.user._id); // Debug Log
 
@@ -147,7 +150,8 @@ router.post(
         userId: req.user._id,
         serviceId: booking.serviceId,
         providerId: booking.assignedPro,
-        rating,
+        serviceRating,
+        providerRating,
         comment,
         detailedRatings,
         images: images || [],
@@ -261,7 +265,7 @@ router.get("/service/:serviceId", async (req, res) => {
     }
 
     if (rating) {
-      query.rating = parseInt(rating);
+      query.serviceRating = parseInt(rating);
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -472,7 +476,7 @@ router.get("/admin/reviews", [auth, adminAuth], async (req, res) => {
     const query = {};
 
     if (status) query.status = status;
-    if (rating) query.rating = parseInt(rating);
+    if (rating) query.serviceRating = parseInt(rating);
     if (search) {
       query.$or = [{ comment: { $regex: search, $options: "i" } }];
     }

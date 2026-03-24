@@ -25,7 +25,13 @@ const reviewSchema = new mongoose.Schema(
       ref: "Professional",
       required: false,
     },
-    rating: {
+    serviceRating: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 5,
+    },
+    providerRating: {
       type: Number,
       required: true,
       min: 1,
@@ -139,12 +145,16 @@ const reviewSchema = new mongoose.Schema(
 // Indexes for better query performance
 reviewSchema.index({ serviceId: 1, status: 1 });
 reviewSchema.index({ userId: 1 });
-reviewSchema.index({ rating: 1 });
+reviewSchema.index({ serviceRating: 1 });
+reviewSchema.index({ providerRating: 1 });
 reviewSchema.index({ createdAt: -1 });
 
-// Virtual for formatted rating
-reviewSchema.virtual("ratingDisplay").get(function () {
-  return this.rating.toFixed(1);
+// Virtual for formatted ratings
+reviewSchema.virtual("serviceRatingDisplay").get(function () {
+  return this.serviceRating ? this.serviceRating.toFixed(1) : null;
+});
+reviewSchema.virtual("providerRatingDisplay").get(function () {
+  return this.providerRating ? this.providerRating.toFixed(1) : null;
 });
 
 // Method to calculate average of detailed ratings
@@ -172,21 +182,21 @@ reviewSchema.statics.getServiceStats = async function (serviceId) {
       $group: {
         _id: null,
         totalReviews: { $sum: 1 },
-        averageRating: { $avg: "$rating" },
+        averageRating: { $avg: "$serviceRating" },
         fiveStarCount: {
-          $sum: { $cond: [{ $eq: ["$rating", 5] }, 1, 0] },
+          $sum: { $cond: [{ $eq: ["$serviceRating", 5] }, 1, 0] },
         },
         fourStarCount: {
-          $sum: { $cond: [{ $eq: ["$rating", 4] }, 1, 0] },
+          $sum: { $cond: [{ $eq: ["$serviceRating", 4] }, 1, 0] },
         },
         threeStarCount: {
-          $sum: { $cond: [{ $eq: ["$rating", 3] }, 1, 0] },
+          $sum: { $cond: [{ $eq: ["$serviceRating", 3] }, 1, 0] },
         },
         twoStarCount: {
-          $sum: { $cond: [{ $eq: ["$rating", 2] }, 1, 0] },
+          $sum: { $cond: [{ $eq: ["$serviceRating", 2] }, 1, 0] },
         },
         oneStarCount: {
-          $sum: { $cond: [{ $eq: ["$rating", 1] }, 1, 0] },
+          $sum: { $cond: [{ $eq: ["$serviceRating", 1] }, 1, 0] },
         },
       },
     },
@@ -221,7 +231,7 @@ reviewSchema.statics.calcAverageRatings = async function (serviceId, providerId)
           $group: {
             _id: "$serviceId",
             nRating: { $sum: 1 },
-            avgRating: { $avg: "$rating" },
+            avgRating: { $avg: "$serviceRating" },
           },
         },
       ]);
@@ -252,7 +262,7 @@ reviewSchema.statics.calcAverageRatings = async function (serviceId, providerId)
           $group: {
             _id: "$providerId",
             nRating: { $sum: 1 },
-            avgRating: { $avg: "$rating" },
+            avgRating: { $avg: "$providerRating" },
           },
         },
       ]);
@@ -295,7 +305,7 @@ reviewSchema.statics.getPlatformStats = async function () {
         $group: {
           _id: null,
           totalReviews: { $sum: 1 },
-          averageRating: { $avg: "$rating" },
+          averageRating: { $avg: "$serviceRating" },
           approvedReviews: {
             $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] },
           },
@@ -309,10 +319,10 @@ reviewSchema.statics.getPlatformStats = async function () {
             $sum: { $cond: [{ $eq: ["$status", "flagged"] }, 1, 0] },
           },
           fiveStarCount: {
-            $sum: { $cond: [{ $eq: ["$rating", 5] }, 1, 0] },
+            $sum: { $cond: [{ $eq: ["$serviceRating", 5] }, 1, 0] },
           },
           oneStarCount: {
-            $sum: { $cond: [{ $eq: ["$rating", 1] }, 1, 0] },
+            $sum: { $cond: [{ $eq: ["$serviceRating", 1] }, 1, 0] },
           },
         },
       },

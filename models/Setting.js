@@ -111,7 +111,7 @@ const settingSchema = new mongoose.Schema(
             heroBanners: [{ type: String }],
             homeScreenMascotUrl: { type: String, default: '' }
         },
-        supportEmail: { type: String, default: 'support@dailydot.com' },
+        supportEmail: { type: String, default: 'dailydotservices@gmail.com' },
         supportPhone: { type: String, default: '' }
     },
     { timestamps: true }

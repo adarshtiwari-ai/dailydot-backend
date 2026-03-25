@@ -88,7 +88,7 @@ router.get("/app-config", async (req, res) => {
             },
             billing: settings.billing || { defaultTaxRate: 0.18, serviceCharge: 50, convenienceFee: 25 },
             activeMapProvider: settings.system?.activeMapProvider || 'google',
-            supportEmail: settings.supportEmail || 'support@dailydot.com',
+            supportEmail: settings.supportEmail || 'dailydotservices@gmail.com',
             supportPhone: settings.supportPhone || ''
         };
 

@@ -2,7 +2,17 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/dailydot');
+    const options = {
+      serverSelectionTimeoutMS: 5000, // 5 seconds
+      connectTimeoutMS: 10000,       // 10 seconds
+      socketTimeoutMS: 45000,        // 45 seconds
+      family: 4                      // Use IPv4 (Render sometimes has issues with IPv6 resolution)
+    };
+
+    const conn = await mongoose.connect(
+      process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/dailydot',
+      options
+    );
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
 

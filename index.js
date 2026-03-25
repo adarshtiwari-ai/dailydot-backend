@@ -45,9 +45,6 @@ const server = http.createServer(app);
 // Initialize Socket.IO
 init(server);
 
-// Connect to MongoDB
-connectDB();
-
 // 1) GLOBAL MIDDLEWARES
 // Compress responses
 app.use(compression());
@@ -167,14 +164,20 @@ app.use((req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
-
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV}`);
-  console.log("Socket.IO enabled");
-  console.log("CORS enabled for React Native development");
-  console.log("✅ Reviews & Ratings system enabled");
+// 4) START SERVER
+connectDB().then(() => {
+  const PORT = process.env.PORT || 3000;
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV}`);
+    console.log("Socket.IO enabled");
+    console.log("CORS enabled for React Native development");
+    console.log("✅ Reviews & Ratings system enabled");
+  });
+}).catch((err) => {
+  console.error("❌ CRITICAL ERROR: Failed to connect to database. Server not started.");
+  console.error(err);
+  process.exit(1);
 });
 
 process.on('unhandledRejection', (err) => {

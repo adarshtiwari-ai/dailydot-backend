@@ -87,7 +87,9 @@ router.get("/app-config", async (req, res) => {
                 homeScreenMascotUrl: settings.homeScreen?.homeScreenMascotUrl ? settings.homeScreen.homeScreenMascotUrl.replace('/upload/', '/upload/f_auto,q_auto,w_1200/') : ''
             },
             billing: settings.billing || { defaultTaxRate: 0.18, serviceCharge: 50, convenienceFee: 25 },
-            activeMapProvider: settings.system?.activeMapProvider || 'google'
+            activeMapProvider: settings.system?.activeMapProvider || 'google',
+            supportEmail: settings.supportEmail || 'support@dailydot.com',
+            supportPhone: settings.supportPhone || ''
         };
 
         res.json({

@@ -110,7 +110,9 @@ const settingSchema = new mongoose.Schema(
             gradientOpacity: { type: Number, default: 1.0 },
             heroBanners: [{ type: String }],
             homeScreenMascotUrl: { type: String, default: '' }
-        }
+        },
+        supportEmail: { type: String, default: 'support@dailydot.com' },
+        supportPhone: { type: String, default: '' }
     },
     { timestamps: true }
 );

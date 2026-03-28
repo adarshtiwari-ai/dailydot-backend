@@ -224,7 +224,17 @@ const bookingSchema = new mongoose.Schema(
     },
     servicePhotos: [{
       type: String
-    }]
+    }],
+    bookingType: { 
+      type: String, 
+      enum: ['standard', 'consultation'], 
+      default: 'standard',
+      index: true
+    },
+    notes: { 
+      type: String, 
+      default: '' 
+    }
   },
   {
     timestamps: true,

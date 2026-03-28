@@ -31,6 +31,7 @@ exports.createBooking = async (req, res) => {
             notes,
             name,
             phone,
+            bookingType,
         } = req.body;
 
         // Process items and calculate total amount securely
@@ -85,6 +86,7 @@ exports.createBooking = async (req, res) => {
             name: name || req.user.name,
             phone: phone || req.user.phone,
             notes,
+            bookingType: bookingType || 'standard',
             paymentMethod: "cod",
             paymentStatus: "pending",
         });

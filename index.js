@@ -146,6 +146,7 @@ app.use("/api/v1/professionals", require("./routes/professionals"));
 app.use("/api/v1/admin", require("./routes/admin"));
 app.use("/api/location", require("./routes/location"));
 app.use("/api/v1/discounts", require("./routes/discountRoutes"));
+app.use("/api/v1/waitlist", require("./routes/waitlist"));
 
 // 3) ERROR HANDLING
 app.use((err, req, res, next) => {

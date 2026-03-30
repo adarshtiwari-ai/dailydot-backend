@@ -35,6 +35,10 @@ const categorySchema = new mongoose.Schema({
   showOnHome: {
     type: Boolean,
     default: true
+  },
+  isComingSoon: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true,

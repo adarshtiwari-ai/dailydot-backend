@@ -71,7 +71,7 @@ const reviewSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ["pending", "approved", "rejected", "flagged"],
-      default: "pending",
+      default: "approved",
     },
     moderationNote: {
       type: String,
@@ -175,7 +175,6 @@ reviewSchema.statics.getServiceStats = async function (serviceId) {
     {
       $match: {
         serviceId: new mongoose.Types.ObjectId(serviceId),
-        status: "approved",
       },
     },
     {
@@ -224,7 +223,6 @@ reviewSchema.statics.calcAverageRatings = async function (serviceId, providerId)
         {
           $match: {
             serviceId: new mongoose.Types.ObjectId(serviceId),
-            status: "approved",
           },
         },
         {
@@ -238,8 +236,8 @@ reviewSchema.statics.calcAverageRatings = async function (serviceId, providerId)
 
       if (serviceStats.length > 0) {
         await Service.findByIdAndUpdate(serviceId, {
-          totalRatings: serviceStats[0].nRating,
-          averageRating: Number(serviceStats[0].avgRating.toFixed(1)),
+          totalRatings: serviceStats[0].nRating || 0,
+          averageRating: serviceStats[0].avgRating ? Number(serviceStats[0].avgRating.toFixed(1)) : 0,
         });
       } else {
         await Service.findByIdAndUpdate(serviceId, {
@@ -255,7 +253,6 @@ reviewSchema.statics.calcAverageRatings = async function (serviceId, providerId)
         {
           $match: {
             providerId: new mongoose.Types.ObjectId(providerId),
-            status: "approved",
           },
         },
         {
@@ -269,8 +266,8 @@ reviewSchema.statics.calcAverageRatings = async function (serviceId, providerId)
 
       if (proStats.length > 0) {
         await Professional.findByIdAndUpdate(providerId, {
-          totalRatings: proStats[0].nRating,
-          averageRating: Number(proStats[0].avgRating.toFixed(1)),
+          totalRatings: proStats[0].nRating || 0,
+          averageRating: proStats[0].avgRating ? Number(proStats[0].avgRating.toFixed(1)) : 0,
         });
       } else {
         await Professional.findByIdAndUpdate(providerId, {

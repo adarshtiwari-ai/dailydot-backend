@@ -15,7 +15,7 @@ module.exports = router;
 const express = require("express");
 const router = express.Router();
 const { auth } = require("../middleware/auth");
-const { createOrder, verifyPayment } = require("../controllers/paymentController");
+const { createOrder, verifyPayment, handleWebhook } = require("../controllers/paymentController");
 
 /**
  * @route   POST /api/v1/payments/create-order
@@ -30,6 +30,13 @@ router.post("/create-order", auth, createOrder);
  * @access  Private
  */
 router.post("/verify", auth, verifyPayment);
+
+/**
+ * @route   POST /api/v1/payments/webhook
+ * @desc    Razorpay Server-to-Server Asynchronous Sync
+ * @access  Public
+ */
+router.post("/webhook", handleWebhook);
 
 module.exports = router;
 

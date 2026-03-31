@@ -133,9 +133,21 @@ exports.verifyPayment = async (req, res) => {
         }
 
         booking.paymentStatus = "paid";
+        booking.status = "confirmed";
         booking.paymentId = razorpay_payment_id;
         booking.paidAt = Date.now();
         await booking.save();
+
+        // 3. Trust Engine: Verify past/future user reviews
+        const Review = require("../models/Review");
+        try {
+            await Review.updateMany(
+                { userId: booking.userId },
+                { $set: { isVerified: true } }
+            );
+        } catch (reviewErr) {
+            console.error("Failed to mark reviews as verified:", reviewErr);
+        }
 
         const updatedBooking = await Booking.findById(booking._id).populate('items.serviceId');
 
@@ -158,5 +170,64 @@ exports.verifyPayment = async (req, res) => {
             message: "Internal verification error",
             error: error.message,
         });
+    }
+};
+
+/**
+ * @desc    Handle Razorpay Webhooks
+ * @route   POST /api/v1/payments/webhook
+ * @access  Public
+ */
+exports.handleWebhook = async (req, res) => {
+    try {
+        const signature = req.headers['x-razorpay-signature'];
+        const rawBody = req.rawBody;
+
+        if (!signature || !rawBody) {
+            return res.status(400).send("Bad Request: Missing signature or raw body");
+        }
+
+        const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+        const expectedSignature = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+
+        if (expectedSignature !== signature) {
+            console.error("WEBHOOK SIGNATURE MISMATCH");
+            return res.status(400).send("Invalid Webhook Signature");
+        }
+
+        const { event, payload } = req.body;
+
+        // Process successful payment events
+        if (event === "payment.captured" || event === "order.paid") {
+            const entity = payload.payment ? payload.payment.entity : payload.order.entity;
+            const orderId = entity.order_id || entity.id; // order_id exists on payment entity, id is on order entity
+            const paymentId = payload.payment ? payload.payment.entity.id : null;
+
+            const booking = await Booking.findOne({ paymentOrderId: orderId });
+
+            if (booking && booking.paymentStatus !== "paid") {
+                booking.paymentStatus = "paid";
+                booking.status = "confirmed";
+                if (paymentId) booking.paymentId = paymentId;
+                booking.paidAt = Date.now();
+                await booking.save();
+
+                // Trust Engine: Verify all associated reviews for this user
+                const Review = require("../models/Review");
+                try {
+                    await Review.updateMany(
+                        { userId: booking.userId },
+                        { $set: { isVerified: true } }
+                    );
+                } catch (reviewErr) {
+                    console.error("Webhook Trust Engine Error:", reviewErr);
+                }
+            }
+        }
+
+        res.status(200).json({ status: "ok" });
+    } catch (error) {
+        console.error("WEBHOOK ERROR:", error);
+        res.status(500).send("Internal Server Error processing webhook");
     }
 };

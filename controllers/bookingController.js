@@ -57,9 +57,11 @@ exports.createBooking = async (req, res) => {
             itemsSubtotal += Math.round(service.price) * (item.quantity || 1);
         }
 
+        const { promoCode } = req.body;
+
         // Centralized Math Engine (Server-Side)
         const { calculateBillDetails } = require("../services/billingService");
-        const billingResult = await calculateBillDetails(itemsSubtotal, [], detailedItems);
+        const billingResult = await calculateBillDetails(itemsSubtotal, [], detailedItems, [], promoCode);
         const {
             taxAmount,
             totalDynamicFees,
@@ -691,7 +693,7 @@ exports.generateInvoice = async (req, res) => {
 // @access  Public
 exports.calculateCheckoutPricing = async (req, res) => {
     try {
-        const { baseCost, items = [] } = req.body;
+        const { baseCost, items = [], promoCode = null } = req.body;
 
         if (baseCost === undefined) {
              return res.status(400).json({
@@ -702,9 +704,16 @@ exports.calculateCheckoutPricing = async (req, res) => {
 
         const { calculateBillDetails } = require("../services/billingService");
         
-        // Use the centralized billing service
-        // Pass baseCost, adjustments (empty), items (for discount check), and materials (empty)
-        const result = await calculateBillDetails(Number(baseCost), [], items, []);
+        // Pass baseCost, adjustments (empty), items (for discount check), and materials (empty), promoCode
+        const result = await calculateBillDetails(Number(baseCost), [], items, [], promoCode);
+
+        // Validation logic for mobile "Apply" button
+        if (promoCode && result.appliedDiscounts.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid or expired promo code"
+            });
+        }
 
         res.json({
             success: true,

@@ -69,6 +69,7 @@ router.post(
  *     tags: [Bookings]
  */
 router.post("/calculate", bookingController.calculateCheckoutPricing);
+router.post("/validate-promo", auth, bookingController.calculateCheckoutPricing);
 
 /**
  * @swagger

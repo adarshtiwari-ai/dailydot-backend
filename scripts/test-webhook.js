@@ -4,11 +4,9 @@ const axios = require("axios");
 
 // Configuration
 // CHANGE THIS TO A REAL PAYMENT ORDER ID FROM YOUR DATABASE to test the flow properly
-const TEST_ORDER_ID = "order_test_XYZ123"; 
-const WEBHOOK_URL = process.env.NODE_ENV === "production" 
-    ? "https://dailydot-api.onrender.com/api/v1/payments/webhook"
-    : "http://localhost:5000/api/v1/payments/webhook"; 
-    
+const TEST_ORDER_ID = "order_test_XYZ123";
+const WEBHOOK_URL = "https://dailydot-api.onrender.com/api/v1/payments/webhook";
+
 const SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
 
 if (!SECRET) {

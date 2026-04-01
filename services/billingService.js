@@ -17,9 +17,9 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
     const safeMaterials = Array.isArray(materials) ? materials : [];
     const settings = await Setting.findOne();
     const billing = settings?.billing || {};
-    
+
     // Constants
-    const PLATFORM_FEE_RATE = 0.10; 
+    const PLATFORM_FEE_RATE = 0.10;
 
     // 1. Calculate Materials & Adjustments
     const adjustmentsTotal = adjustments.reduce((sum, adj) => sum + (Number(adj.amount) || 0), 0);
@@ -32,7 +32,7 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
 
     if (promoCode) {
         const now = new Date();
-        const discount = await Discount.findOne({ 
+        const discount = await Discount.findOne({
             code: promoCode.toUpperCase().trim(),
             isActive: true,
             $or: [
@@ -75,8 +75,11 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
             }
 
             if (discountAmount > 0) {
-                appliedDiscounts.push({ 
-                    name: `${discount.name} (${discount.code})`, 
+                // Phase 1 Security: Clamp discount to taxable subtotal
+                discountAmount = Math.min(discountAmount, taxableSubtotal);
+
+                appliedDiscounts.push({
+                    name: `${discount.name} (${discount.code})`,
                     amount: -discountAmount,
                     code: discount.code
                 });
@@ -84,7 +87,8 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
         }
     }
 
-    const discountedSubtotal = taxableSubtotal - discountAmount;
+    // Ensure subtotal doesn't drop below zero
+    const discountedSubtotal = Math.max(0, taxableSubtotal - discountAmount);
 
     // 3. Handle Tax
     let taxRate = billing.defaultTaxRate !== undefined ? billing.defaultTaxRate : 0.18;
@@ -98,7 +102,7 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
     // 4. Calculate Dynamic Global Fees
     let totalDynamicFees = 0;
     const appliedFees = [];
-    
+
     if (billing.globalFees && billing.globalFees.length > 0) {
         billing.globalFees.forEach(fee => {
             if (fee.isActive) {
@@ -116,8 +120,8 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
 
     appliedFees.push({ name: "Taxes (GST)", amount: totalTax });
 
-    // 5. Final Total
-    const finalTotal = discountedSubtotal + totalTax + totalDynamicFees + adjustmentsTotal;
+    // 5. Final Total with zero floor security
+    const finalTotal = Math.max(0, discountedSubtotal + totalTax + totalDynamicFees + adjustmentsTotal);
 
     return {
         subtotal: taxableSubtotal,

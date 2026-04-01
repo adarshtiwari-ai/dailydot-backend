@@ -16,8 +16,7 @@ mongoose.connect(MONGO_URI)
             services.forEach(s => {
                 console.log(`ID: ${s._id}`);
                 console.log(`Name: ${s.name}`);
-                console.log(`TagId: ${s.tagId}`);
-                console.log(`Tags (Raw Object): ${JSON.stringify(s.tags)}`);
+                console.log(`isStartingPrice: ${s.isStartingPrice}`);
                 console.log('---------------------------');
             });
 

@@ -26,4 +26,7 @@ router.get('/providers/:id/transactions', auth, adminAuth, adminController.getPr
 // POST /api/v1/admin/notifications/broadcast
 router.post('/notifications/broadcast', auth, adminAuth, adminController.broadcastNotification);
 
+// Promo/Discount Management
+router.use('/discounts', require('./discountRoutes'));
+
 module.exports = router;

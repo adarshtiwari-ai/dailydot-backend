@@ -12,6 +12,9 @@ router.post('/bookings/:id/materials', adminController.addBookingMaterial);
 // PATCH /api/v1/admin/bookings/:id/adjust
 router.patch('/bookings/:id/adjust', adminController.adjustBookingPrice);
 
+// POST /api/v1/admin/bookings/:id/submit-quote
+router.post('/bookings/:id/submit-quote', adminAuth, require('../controllers/bookingController').submitQuote);
+
 // POST /api/v1/admin/providers/:id/settle
 router.post('/providers/:id/settle', adminController.settleProviderDues);
 

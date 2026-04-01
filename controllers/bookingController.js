@@ -7,6 +7,7 @@ const { validationResult } = require("express-validator");
 const eventHub = require("../services/event.service");
 const { generateInvoicePDF } = require("../services/pdfService");
 const walletService = require("../services/walletService");
+const notificationService = require("../services/notification.service");
 
 // @desc    Create a new booking
 // @route   POST /api/v1/bookings
@@ -91,6 +92,7 @@ exports.createBooking = async (req, res) => {
             bookingType: bookingType || 'standard',
             paymentMethod: "cod",
             paymentStatus: "pending",
+            billingStatus: "pending_visit", // Service Agreement logic: Start as quote-pending
         });
 
         // Populate the booking with details
@@ -223,7 +225,7 @@ exports.updateBookingStatus = async (req, res) => {
         if (status === "completed" || status === "Completed") {
             const safeMaterialCost = Number(materialCost) || 0;
             const safeAdminCommission = Number(adminCommission) || 0;
-            
+
             updateData.materialCost = safeMaterialCost;
             updateData.adminCommission = safeAdminCommission;
             updateData.netPlatformProfit = safeAdminCommission;
@@ -246,9 +248,9 @@ exports.updateBookingStatus = async (req, res) => {
 
         // Validation: Cannot complete/settle without an assigned professional
         if ((status === 'completed' || status === 'Completed') && !booking.assignedPro) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Cannot complete and settle a booking without an assigned professional.' 
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot complete and settle a booking without an assigned professional.'
             });
         }
 
@@ -260,7 +262,7 @@ exports.updateBookingStatus = async (req, res) => {
             const totalToSplit = booking.finalTotal || booking.totalAmount || 0;
             const mCost = booking.materialCost || 0;
             const aComm = booking.adminCommission || 0;
-            
+
             // The split: Provider Payout = Total - Materials - Commission
             const providerPayout = totalToSplit - mCost - aComm;
 
@@ -269,7 +271,7 @@ exports.updateBookingStatus = async (req, res) => {
                 // Platform take-home = Total - Payout = Materials + Commission.
                 // We charge the provider for the platform's share.
                 const platformTakeHome = totalToSplit - providerPayout;
-                
+
                 if (platformTakeHome > 0) {
                     await walletService.chargePlatformFee(
                         booking.assignedPro._id || booking.assignedPro,
@@ -519,38 +521,38 @@ exports.rateBooking = async (req, res) => {
                 .json({ success: false, message: "Booking already rated" });
         }
 
-    // Update Booking status
-    booking.serviceRating = serviceRating;
-    booking.proRating = proRating;
-    booking.comment = comment;
-    booking.isRated = true;
-    await booking.save();
+        // Update Booking status
+        booking.serviceRating = serviceRating;
+        booking.proRating = proRating;
+        booking.comment = comment;
+        booking.isRated = true;
+        await booking.save();
 
-    // NEW: Create a standalone Review document (The Single Source of Truth)
-    // This will trigger the post-save hooks in Review.js to update Service/Professional averages
-    if (booking.items && booking.items.length > 0) {
-      await Review.create({
-        bookingId: booking._id,
-        userId: booking.userId,
-        serviceId: booking.items[0].serviceId,
-        providerId: booking.assignedPro, // links to Professional
-        rating: serviceRating,
-        comment: comment,
-        status: "approved", // Auto-approved for verified bookings
-      });
+        // NEW: Create a standalone Review document (The Single Source of Truth)
+        // This will trigger the post-save hooks in Review.js to update Service/Professional averages
+        if (booking.items && booking.items.length > 0) {
+            await Review.create({
+                bookingId: booking._id,
+                userId: booking.userId,
+                serviceId: booking.items[0].serviceId,
+                providerId: booking.assignedPro, // links to Professional
+                rating: serviceRating,
+                comment: comment,
+                status: "approved", // Auto-approved for verified bookings
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Rating submitted successfully and review generated",
+            booking,
+        });
+    } catch (error) {
+        console.error("Rating Error:", error);
+        res
+            .status(500)
+            .json({ success: false, message: "Failed to submit rating" });
     }
-
-    res.json({
-      success: true,
-      message: "Rating submitted successfully and review generated",
-      booking,
-    });
-  } catch (error) {
-    console.error("Rating Error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to submit rating" });
-  }
 };
 
 // @desc    Get all bookings (Admin only)
@@ -696,14 +698,14 @@ exports.calculateCheckoutPricing = async (req, res) => {
         const { baseCost, items = [], promoCode = null } = req.body;
 
         if (baseCost === undefined) {
-             return res.status(400).json({
+            return res.status(400).json({
                 success: false,
                 message: "baseCost is required",
             });
         }
 
         const { calculateBillDetails } = require("../services/billingService");
-        
+
         // Pass baseCost, adjustments (empty), items (for discount check), and materials (empty), promoCode
         const result = await calculateBillDetails(Number(baseCost), [], items, [], promoCode);
 
@@ -725,5 +727,130 @@ exports.calculateCheckoutPricing = async (req, res) => {
             success: false,
             message: "Server error while calculating pricing",
         });
+    }
+};
+
+// @desc    Submit Final Quote (Admin Only)
+// @route   POST /api/v1/admin/bookings/:id/submit-quote
+// @access  Private (Admin)
+exports.submitQuote = async (req, res) => {
+    try {
+        const { totalAmount } = req.body;
+        if (!totalAmount) {
+            return res.status(400).json({ success: false, message: "Quote amount is required" });
+        }
+
+        const booking = await Booking.findById(req.params.id).populate('items.serviceId');
+        if (!booking) {
+            return res.status(404).json({ success: false, message: "Booking not found" });
+        }
+
+        booking.quote = {
+            total: Math.round(totalAmount),
+            isApproved: false
+        };
+        booking.billingStatus = 'quote_sent';
+        await booking.save();
+
+        // Trigger Push Notification to User
+        try {
+            const serviceName = booking.items && booking.items.length > 0
+                ? booking.items[0].name
+                : "your requested service";
+
+            await notificationService.sendPushNotification(
+                booking.userId,
+                `Quote Ready for ${serviceName}!`,
+                `Your pro has assessed the job. Review and approve the final quote of ₹${totalAmount} to start work.`,
+                { bookingId: booking._id.toString(), type: "quote_received" }
+            );
+        } catch (pushErr) {
+            console.error("Failed to send quote notification:", pushErr);
+        }
+
+        res.json({
+            success: true,
+            message: "Quote submitted successfully",
+            booking
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Approve Quote
+// @route   POST /api/v1/bookings/:id/approve-quote
+// @access  Private
+exports.approveQuote = async (req, res) => {
+    try {
+        const booking = await Booking.findById(req.params.id);
+        if (!booking) {
+            return res.status(404).json({ success: false, message: "Booking not found" });
+        }
+
+        if (booking.userId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
+
+        booking.quote.isApproved = true;
+        booking.quote.approvedAt = new Date();
+        booking.billingStatus = 'approved';
+        booking.status = 'confirmed'; // Auto-confirm on approval
+
+        await booking.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Quote approved successfully",
+            booking
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Record Payment / Installment
+// @route   POST /api/v1/bookings/:id/record-payment
+// @access  Private
+exports.recordPayment = async (req, res) => {
+    try {
+        const { amount, method, transactionId } = req.body;
+        const booking = await Booking.findById(req.params.id);
+
+        if (!booking) {
+            return res.status(404).json({ success: false, message: "Booking not found" });
+        }
+
+        // Add to installments
+        booking.installments.push({
+            amount: Math.round(amount),
+            method: method || 'online',
+            transactionId,
+            status: 'paid',
+            paidAt: new Date()
+        });
+
+        // Check if fully paid
+        const totalPaid = booking.installments.reduce((sum, inst) => sum + inst.amount, 0);
+        const targetAmount = booking.quote?.total || booking.totalAmount;
+
+        if (totalPaid >= targetAmount) {
+            booking.paymentStatus = 'paid';
+            if (booking.billingStatus === 'approved') {
+                booking.billingStatus = 'completed';
+            }
+        }
+
+        await booking.save();
+
+        res.json({
+            success: true,
+            message: "Payment recorded successfully",
+            totalPaid,
+            remaining: Math.max(0, targetAmount - totalPaid),
+            booking
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
 };

@@ -104,27 +104,41 @@ const bookingSchema = new mongoose.Schema(
     finalTotal: {
       type: Number, // stored in paise/cents
       set: v => Math.round(v),
-      default: function () { 
+      default: function () {
         const base = this.subtotal || this.baseCost || this.totalAmount || 0;
         const adjustmentsTotal = (this.adjustments || []).reduce((sum, adj) => sum + adj.amount, 0);
         const materialsTotal = (this.materials || []).reduce((sum, mat) => sum + (mat.cost || 0), 0);
         const tax = this.taxAmount || 0;
         const sFee = this.serviceFee || 0;
         const cFee = this.convenienceFee || 0;
-        
+
         // If taxDetails are used (legacy/external), include them too
         const cgst = this.taxDetails?.cgst || 0;
         const sgst = this.taxDetails?.sgst || 0;
         const platformFee = this.taxDetails?.platformFee || 0;
-        
+
         return base + adjustmentsTotal + materialsTotal + tax + sFee + cFee + cgst + sgst + platformFee;
       }
     },
     billingStatus: {
       type: String,
-      enum: ['quote', 'finalized', 'invoiced'],
-      default: 'quote'
+      enum: ['pending_visit', 'quote_sent', 'approved', 'completed'],
+      default: 'pending_visit'
     },
+    quote: {
+      total: { type: Number, default: 0 },
+      isApproved: { type: Boolean, default: false },
+      approvedAt: { type: Date }
+    },
+    installments: [
+      {
+        amount: { type: Number, required: true },
+        method: { type: String, enum: ['online', 'cod'], default: 'online' },
+        transactionId: String,
+        status: { type: String, enum: ['pending', 'paid', 'failed'], default: 'paid' },
+        paidAt: { type: Date, default: Date.now }
+      }
+    ],
     materials: [
       {
         name: { type: String, required: true },
@@ -225,15 +239,15 @@ const bookingSchema = new mongoose.Schema(
     servicePhotos: [{
       type: String
     }],
-    bookingType: { 
-      type: String, 
-      enum: ['standard', 'consultation'], 
+    bookingType: {
+      type: String,
+      enum: ['standard', 'consultation'],
       default: 'standard',
       index: true
     },
-    notes: { 
-      type: String, 
-      default: '' 
+    notes: {
+      type: String,
+      default: ''
     }
   },
   {

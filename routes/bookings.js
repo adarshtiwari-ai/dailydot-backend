@@ -166,6 +166,24 @@ router.patch("/:id/cancel", auth, bookingController.cancelBooking);
 
 /**
  * @swagger
+ * /api/v1/bookings/{id}/approve-quote:
+ *   post:
+ *     summary: Approve a service quote
+ *     tags: [Bookings]
+ */
+router.post("/:id/approve-quote", auth, bookingController.approveQuote);
+
+/**
+ * @swagger
+ * /api/v1/bookings/{id}/record-payment:
+ *   post:
+ *     summary: Record a partial or full payment
+ *     tags: [Bookings]
+ */
+router.post("/:id/record-payment", auth, bookingController.recordPayment);
+
+/**
+ * @swagger
  * /api/v1/bookings/{id}/confirm-cod:
  *   post:
  *     summary: Confirm COD booking

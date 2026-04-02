@@ -203,22 +203,23 @@ exports.updateBookingStatus = async (req, res) => {
 
         const { status, proName, proPhone, materialCost, adminCommission, taxAmount } = req.body;
         let assignedProId = null;
+        let finalStatus = status;
 
         // Logic for Assigning Professional on Confirmation
         if (status === "confirmed" && proName && proPhone) {
-            // Find or create pro
+            // Find pro (Strict Validation - No Ghost Profiles)
             let pro = await Professional.findOne({ phone: proPhone });
             if (!pro) {
-                pro = await Professional.create({
-                    name: proName,
-                    phone: proPhone,
+                return res.status(400).json({
+                    success: false,
+                    message: "Professional not found with this phone number."
                 });
-                console.log(`New Professional Created: ${pro.name}`);
             }
             assignedProId = pro._id;
+            finalStatus = "assigned"; // State Alignment: explicitly set to 'assigned'
         }
 
-        const updateData = { status };
+        const updateData = { status: finalStatus };
         if (assignedProId) {
             updateData.assignedPro = assignedProId;
         }
@@ -303,8 +304,22 @@ exports.updateBookingStatus = async (req, res) => {
         // Emit BOOKING_STATUS_UPDATED event
         eventHub.emit("BOOKING_STATUS_UPDATED", {
             booking,
-            status,
+            status: finalStatus,
         });
+
+        // Trigger Push Notification to newly assigned Professional
+        if (finalStatus === "assigned" && assignedProId) {
+            try {
+                await notificationService.sendPushNotification(
+                    assignedProId,
+                    "New Job Assigned",
+                    "You have been assigned to a new booking. Please review and provide a quote.",
+                    { bookingId: booking._id.toString(), type: "job_assigned" }
+                );
+            } catch (pushErr) {
+                console.error("Failed to send assignment notification:", pushErr);
+            }
+        }
     } catch (error) {
         console.error("Update Status Error:", error);
         res.status(500).json({
@@ -737,7 +752,7 @@ exports.calculateCheckoutPricing = async (req, res) => {
 // @access  Private (Admin)
 exports.submitQuote = async (req, res) => {
     try {
-        const { totalAmount, breakdown = {} } = req.body;
+        const { totalAmount, breakdown = {}, materials = [], notes } = req.body;
         if (!totalAmount) {
             return res.status(400).json({ success: false, message: "Quote amount is required" });
         }
@@ -764,12 +779,21 @@ exports.submitQuote = async (req, res) => {
             basePrice: Math.round(breakdown.basePrice || 0),
             tax: Math.round(breakdown.tax || 0),
             materials: Math.round(breakdown.materials || 0),
+            materialsList: materials.map(m => ({ name: m.name, cost: Math.round(m.cost) })),
             platformFee: finalPlatformFee,
             convenienceFee: finalConvenienceFee,
             total: Math.round(totalAmount),
             isApproved: false
         };
+        
+        // Atomic Materials Overwrite
+        booking.materials = materials.map(m => ({ name: m.name, cost: Math.round(m.cost) }));
+
+        // Unified State Alignment
         booking.billingStatus = 'quote_sent';
+        booking.status = 'quote_sent';
+        
+        if (notes !== undefined) booking.notes = notes;
         
         // SYNC: Ensure Grand Total and Final Total are locked to the quote amount
         booking.totalAmount = Math.round(totalAmount);
@@ -825,6 +849,27 @@ exports.approveQuote = async (req, res) => {
 
         await booking.save();
 
+        // 1. Backend Worker Notification (Push)
+        if (booking.assignedPro) {
+            try {
+                const proId = booking.assignedPro._id || booking.assignedPro;
+                await notificationService.sendPushNotification(
+                    proId,
+                    "Quote Approved! 🟢",
+                    "The customer has approved the quote. You are clear to begin the service.",
+                    { bookingId: booking._id.toString(), type: "quote_approved" }
+                );
+            } catch (pushErr) {
+                console.error("Failed to send quote approval notification:", pushErr);
+            }
+        }
+
+        // 2. Backend Admin Broadcast (Socket)
+        eventHub.emit("BOOKING_STATUS_UPDATED", {
+            bookingId: booking._id,
+            status: 'confirmed'
+        });
+
         res.status(200).json({
             success: true,
             message: "Quote approved successfully",
@@ -860,14 +905,22 @@ exports.recordPayment = async (req, res) => {
         const totalPaid = booking.installments.reduce((sum, inst) => sum + inst.amount, 0);
         const targetAmount = booking.quote?.total || booking.totalAmount;
 
+        let fullyPaid = false;
         if (totalPaid >= targetAmount) {
             booking.paymentStatus = 'paid';
             if (booking.billingStatus === 'approved') {
                 booking.billingStatus = 'completed';
             }
+            booking.status = 'completed';
+            fullyPaid = true;
         }
 
         await booking.save();
+
+        if (fullyPaid) {
+            const eventHub = require("../services/event.service");
+            eventHub.emit("BOOKING_STATUS_UPDATED", { bookingId: booking._id, status: 'completed' });
+        }
 
         res.json({
             success: true,

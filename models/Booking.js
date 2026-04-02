@@ -53,7 +53,7 @@ const bookingSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Pending", "Confirmed", "Completed", "Cancelled", "pending", "confirmed", "assigned", "on_the_way", "in_progress", "completed", "cancelled"],
+      enum: ["Pending", "Confirmed", "Completed", "Cancelled", "pending", "confirmed", "assigned", "on_the_way", "in_progress", "completed", "cancelled", "quote_sent"],
       default: "Pending",
       index: true,
     },
@@ -129,6 +129,7 @@ const bookingSchema = new mongoose.Schema(
       basePrice: { type: Number, default: 0 },
       tax: { type: Number, default: 0 },
       materials: { type: Number, default: 0 },
+      materialsList: [{ name: String, cost: Number }],
       platformFee: { type: Number, default: 0 },
       convenienceFee: { type: Number, default: 0 },
       total: { type: Number, default: 0 },

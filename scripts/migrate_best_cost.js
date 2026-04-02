@@ -1,12 +1,18 @@
 const mongoose = require("mongoose");
-require("dotenv").config();
+const path = require('path');
+require("dotenv").config({ path: path.resolve(__dirname, '../.env') });
 const Service = require("../models/Service");
 
 const migrateBestCostPrice = async () => {
     try {
         console.log("--- STARTING BEST COST PRICE MIGRATION ---");
         
-        await mongoose.connect(process.env.MONGO_URI);
+        const uri = process.env.MONGO_URI || process.env.MONGODB_URI;
+        if (!uri) {
+            throw new Error("Database URI not found in .env file (checked MONGO_URI and MONGODB_URI)");
+        }
+
+        await mongoose.connect(uri);
         console.log("Connected to MongoDB...");
 
         const services = await Service.find({ bestCostPrice: { $exists: false } });

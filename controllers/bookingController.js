@@ -695,7 +695,7 @@ exports.generateInvoice = async (req, res) => {
 // @access  Public
 exports.calculateCheckoutPricing = async (req, res) => {
     try {
-        const { baseCost, items = [], promoCode = null } = req.body;
+        const { baseCost, items = [], materials = [], adjustments = [], promoCode = null } = req.body;
 
         if (baseCost === undefined) {
             return res.status(400).json({
@@ -706,8 +706,8 @@ exports.calculateCheckoutPricing = async (req, res) => {
 
         const { calculateBillDetails } = require("../services/billingService");
 
-        // Pass baseCost, adjustments (empty), items (for discount check), and materials (empty), promoCode
-        const result = await calculateBillDetails(Number(baseCost), [], items, [], promoCode);
+        // Pass baseCost, adjustments, items, and materials
+        const result = await calculateBillDetails(Number(baseCost), adjustments, items, materials, promoCode);
 
         // Validation logic for mobile "Apply" button
         if (promoCode && result.appliedDiscounts.length === 0) {
@@ -750,6 +750,12 @@ exports.submitQuote = async (req, res) => {
             isApproved: false
         };
         booking.billingStatus = 'quote_sent';
+        
+        // SYNC: Ensure Grand Total and Final Total are locked to the quote amount
+        booking.totalAmount = Math.round(totalAmount);
+        booking.finalTotal = Math.round(totalAmount);
+
+        // PERSISTENCE: Strict await before any side effects (like push notifications)
         await booking.save();
 
         // Trigger Push Notification to User

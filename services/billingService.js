@@ -20,8 +20,9 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
     const billing = settings?.billing || {};
 
     // 1. Fetch Dynamic Fees from Settings
-    const platformFee = (Number(billing.serviceCharge) || 0) * 100; // in Paise
-    const convenienceFee = (Number(billing.convenienceFee) || 0) * 100; // in Paise
+    const platformFee = (Number(billing.serviceCharge) ?? 0) * 100; // in Paise
+    const convenienceFee = (Number(billing.convenienceFee) ?? 0) * 100; // in Paise
+    const taxRate = Number(billing.defaultTaxRate) ?? 0.18; // Use setting or fallback to 18%
 
     // 2. Calculate Materials & Adjustments
     const adjustmentsTotal = adjustments.reduce((sum, adj) => sum + (Number(adj.amount) || 0), 0);
@@ -82,7 +83,6 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
     }
 
     // 4. Handle Tax (STRICTLY ON bestCostTotal/taxableBase)
-    const taxRate = 0.18; // Fixed GST policy
     const totalTax = Math.round(taxableBase * taxRate);
     const cgst = Math.round(totalTax / 2);
     const sgst = totalTax - cgst;
@@ -95,6 +95,7 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
         subtotal: taxableBase,
         discountAmount,
         taxAmount: totalTax,
+        taxRate, // Persist the rate used for this calculation
         cgst,
         sgst,
         platformFee,

@@ -765,19 +765,22 @@ exports.submitQuote = async (req, res) => {
         // SAFETY NET: If the frontend sent 0 for fees (race condition), fetch settings as a last resort
         let finalPlatformFee = Math.round(breakdown.platformFee || 0);
         let finalConvenienceFee = Math.round(breakdown.convenienceFee || 0);
+        let finalTaxRate = breakdown.taxRate;
 
-        if (finalPlatformFee === 0 || finalConvenienceFee === 0) {
+        if (finalPlatformFee === 0 || finalConvenienceFee === 0 || finalTaxRate === undefined) {
             const Setting = require("../models/Setting");
             const settings = await Setting.findOne();
             if (settings?.billing) {
                 if (finalPlatformFee === 0) finalPlatformFee = (Number(settings.billing.serviceCharge) || 0) * 100;
                 if (finalConvenienceFee === 0) finalConvenienceFee = (Number(settings.billing.convenienceFee) || 0) * 100;
+                if (finalTaxRate === undefined) finalTaxRate = Number(settings.billing.defaultTaxRate) || 0.18;
             }
         }
 
         booking.quote = {
             basePrice: Math.round(breakdown.basePrice || 0),
             tax: Math.round(breakdown.tax || 0),
+            taxRate: finalTaxRate, // Locking the rate for this specific quote
             materials: Math.round(breakdown.materials || 0),
             materialsList: materials.map(m => ({ name: m.name, cost: Math.round(m.cost) })),
             platformFee: finalPlatformFee,

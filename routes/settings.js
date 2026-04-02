@@ -86,7 +86,7 @@ router.get("/app-config", async (req, res) => {
                 heroBanners: settings.homeScreen?.heroBanners || [],
                 homeScreenMascotUrl: settings.homeScreen?.homeScreenMascotUrl ? settings.homeScreen.homeScreenMascotUrl.replace('/upload/', '/upload/f_auto,q_auto,w_1200/') : ''
             },
-            billing: settings.billing || { defaultTaxRate: 0.18, serviceCharge: 50, convenienceFee: 25 },
+            billing: settings.billing || { defaultTaxRate: 0.18, serviceCharge: 0, convenienceFee: 0 },
             activeMapProvider: settings.system?.activeMapProvider || 'google',
             supportEmail: settings.supportEmail || 'dailydotservices@gmail.com',
             supportPhone: settings.supportPhone || ''
@@ -194,56 +194,28 @@ router.put("/mascot", [auth, adminAuth, upload.single("image")], async (req, res
     }
 });
 
-// Update settings
+// @desc    Update settings (Atomic)
+// @route   PUT /api/v1/settings
+// @access  Private (Admin)
 router.put("/", [auth, adminAuth], async (req, res) => {
     try {
-        const { system, notifications, theme, navigation, homeLayout, safetyShield, featuredServices, billing, splash, featureFlags, homeScreen } = req.body;
-        let settings = await Setting.findOne();
-
-        if (!settings) {
-            settings = new Setting();
-        }
-
-        // Update fields if provided
-        if (system) {
-            settings.system = { ...settings.system.toObject(), ...system };
-            settings.markModified('system');
-        }
-        if (billing) {
-            settings.billing = { ...settings.billing.toObject(), ...billing };
-            settings.markModified('billing');
-        }
-        if (notifications) settings.notifications = { ...settings.notifications.toObject(), ...notifications };
-        if (theme) settings.theme = { ...settings.theme.toObject(), ...theme };
-        if (navigation) settings.navigation = navigation;
-        if (homeLayout) settings.homeLayout = homeLayout;
-        if (safetyShield) settings.safetyShield = safetyShield;
-        if (featuredServices) settings.featuredServices = featuredServices;
-        if (splash) {
-            settings.splash = { ...settings.splash?.toObject(), ...splash };
-            settings.markModified('splash');
-        }
-        if (featureFlags) {
-            settings.featureFlags = { ...settings.featureFlags?.toObject(), ...featureFlags };
-            settings.markModified('featureFlags');
-        }
-        if (homeScreen) {
-            settings.homeScreen = { ...settings.homeScreen?.toObject(), ...homeScreen };
-            settings.markModified('homeScreen');
-        }
-
-        await settings.save();
+        // Use findOneAndUpdate with $set for atomic, partial updates
+        const settings = await Setting.findOneAndUpdate(
+            {}, 
+            { $set: req.body }, 
+            { upsert: true, new: true, runValidators: true }
+        );
 
         res.json({
             success: true,
-            message: "Settings updated successfully",
+            message: "Settings updated successfully (Atomic)",
             data: settings,
         });
     } catch (error) {
-        console.error("Update settings error:", error);
+        console.error("Update settings error (Atomic):", error);
         res.status(500).json({
             success: false,
-            message: "Failed to update settings",
+            message: "Failed to update settings atomically",
         });
     }
 });

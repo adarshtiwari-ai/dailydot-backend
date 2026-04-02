@@ -81,8 +81,8 @@ const settingSchema = new mongoose.Schema(
         },
         billing: {
             defaultTaxRate: { type: Number, default: 0.18 },
-            serviceCharge: { type: Number, default: 50 },
-            convenienceFee: { type: Number, default: 25 },
+            serviceCharge: { type: Number, default: 0 },
+            convenienceFee: { type: Number, default: 0 },
             globalFees: [{
                 name: { type: String, required: true },
                 amount: { type: Number, required: true },

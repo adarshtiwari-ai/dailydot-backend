@@ -126,6 +126,11 @@ const bookingSchema = new mongoose.Schema(
       default: 'pending_visit'
     },
     quote: {
+      basePrice: { type: Number, default: 0 },
+      tax: { type: Number, default: 0 },
+      materials: { type: Number, default: 0 },
+      platformFee: { type: Number, default: 0 },
+      convenienceFee: { type: Number, default: 0 },
       total: { type: Number, default: 0 },
       isApproved: { type: Boolean, default: false },
       approvedAt: { type: Date }

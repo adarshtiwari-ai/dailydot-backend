@@ -737,17 +737,22 @@ exports.calculateCheckoutPricing = async (req, res) => {
 // @access  Private (Admin)
 exports.submitQuote = async (req, res) => {
     try {
-        const { totalAmount } = req.body;
+        const { totalAmount, breakdown = {} } = req.body;
         if (!totalAmount) {
             return res.status(400).json({ success: false, message: "Quote amount is required" });
         }
 
-        const booking = await Booking.findById(req.params.id).populate('items.serviceId');
+        const booking = await Booking.findById(req.params.id);
         if (!booking) {
             return res.status(404).json({ success: false, message: "Booking not found" });
         }
 
         booking.quote = {
+            basePrice: Math.round(breakdown.basePrice || 0),
+            tax: Math.round(breakdown.tax || 0),
+            materials: Math.round(breakdown.materials || 0),
+            platformFee: Math.round(breakdown.platformFee || 0),
+            convenienceFee: Math.round(breakdown.convenienceFee || 0),
             total: Math.round(totalAmount),
             isApproved: false
         };

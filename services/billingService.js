@@ -5,30 +5,34 @@ const mongoose = require("mongoose");
 /**
  * Calculates all billing metrics using integer math (paise/cents).
  * 
- * @param {number} baseCost - The initial cost (in Paise).
- * @param {Array} adjustments - Optional adjustments.
- * @param {Array} items - Items in the cart (for specific discount filtering).
+ * @param {number} baseCost - The customer-facing base price (before additions).
+ * @param {Array} adjustments - Optional adjustments (manual discounts/additions).
+ * @param {Array} items - Items in the cart.
  * @param {Array} materials - Material updates.
  * @param {string} promoCode - Applied promo code (optional).
+ * @param {number} bestCostTotal - The taxable base of the service (Service-Agreement logic).
  * @returns {Object} Full bill breakdown.
  */
-const calculateBillDetails = async (baseCost, adjustments = [], items = [], materials = [], promoCode = null) => {
+const calculateBillDetails = async (baseCost, adjustments = [], items = [], materials = [], promoCode = null, bestCostTotal = null) => {
     const safeBaseCost = Number(baseCost) || 0;
     const safeMaterials = Array.isArray(materials) ? materials : [];
     const settings = await Setting.findOne();
     const billing = settings?.billing || {};
 
-    // Constants
-    const PLATFORM_FEE_RATE = 0.10;
+    // 1. Fetch Dynamic Fees from Settings
+    const platformFee = (Number(billing.serviceCharge) || 0) * 100; // in Paise
+    const convenienceFee = (Number(billing.convenienceFee) || 0) * 100; // in Paise
 
-    // 1. Calculate Materials & Adjustments
+    // 2. Calculate Materials & Adjustments
     const adjustmentsTotal = adjustments.reduce((sum, adj) => sum + (Number(adj.amount) || 0), 0);
     const materialsTotal = safeMaterials.reduce((sum, mat) => sum + (Number(mat.cost) || 0), 0);
-    const taxableSubtotal = safeBaseCost + materialsTotal;
+    
+    // Use bestCostTotal if provided (from Admin UI), otherwise fallback to baseCost
+    const taxableBase = Number(bestCostTotal) || safeBaseCost;
 
-    // 2. Handle Dynamic Promo Logic (CRITICAL)
-    const appliedDiscounts = [];
+    // 3. Handle Promo Logic (Applied only to Service Base if not universal)
     let discountAmount = 0;
+    const appliedDiscounts = [];
 
     if (promoCode) {
         const now = new Date();
@@ -44,15 +48,10 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
 
         if (discount) {
             if (discount.isUniversal) {
-                // Scenario A: Universal Discount
-                if (discount.type === 'percentage') {
-                    discountAmount = Math.round(taxableSubtotal * (discount.value / 100));
-                } else {
-                    discountAmount = discount.value * 100; // Convert Flat Rupee to Paise
-                }
+                discountAmount = discount.type === 'percentage' 
+                    ? Math.round(taxableBase * (discount.value / 100))
+                    : discount.value * 100;
             } else {
-                // Scenario B: Service-Specific Discount
-                // Only calculate on eligible items
                 const eligibleTotal = items
                     .filter(item => {
                         const sId = item.serviceId?._id || item.serviceId || item.id;
@@ -61,23 +60,18 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
                     .reduce((sum, item) => sum + (Number(item.price) || 0), 0);
 
                 if (eligibleTotal > 0) {
-                    if (discount.type === 'percentage') {
-                        discountAmount = Math.round(eligibleTotal * (discount.value / 100));
-                    } else {
-                        discountAmount = discount.value * 100;
-                    }
+                    discountAmount = discount.type === 'percentage'
+                        ? Math.round(eligibleTotal * (discount.value / 100))
+                        : discount.value * 100;
                 }
             }
 
-            // Enforce Max Cap
             if (discount.maxDiscountAmount > 0 && discountAmount > discount.maxDiscountAmount) {
                 discountAmount = discount.maxDiscountAmount;
             }
 
+            discountAmount = Math.min(discountAmount, taxableBase);
             if (discountAmount > 0) {
-                // Phase 1 Security: Clamp discount to taxable subtotal
-                discountAmount = Math.min(discountAmount, taxableSubtotal);
-
                 appliedDiscounts.push({
                     name: `${discount.name} (${discount.code})`,
                     amount: -discountAmount,
@@ -87,54 +81,26 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
         }
     }
 
-    // Ensure subtotal doesn't drop below zero
-    const discountedSubtotal = Math.max(0, taxableSubtotal - discountAmount);
-
-    // 3. Handle Tax
-    let taxRate = billing.defaultTaxRate !== undefined ? billing.defaultTaxRate : 0.18;
-    if (taxRate > 1) taxRate = taxRate / 100;
-
-    const totalTax = Math.round(discountedSubtotal * taxRate);
+    // 4. Handle Tax (STRICTLY ON bestCostTotal/taxableBase)
+    const taxRate = 0.18; // Fixed GST policy
+    const totalTax = Math.round(taxableBase * taxRate);
     const cgst = Math.round(totalTax / 2);
     const sgst = totalTax - cgst;
-    const platformFee = Math.round(discountedSubtotal * PLATFORM_FEE_RATE);
 
-    // 4. Calculate Dynamic Global Fees
-    let totalDynamicFees = 0;
-    const appliedFees = [];
-
-    if (billing.globalFees && billing.globalFees.length > 0) {
-        billing.globalFees.forEach(fee => {
-            if (fee.isActive) {
-                let feeAmount = 0;
-                if (fee.type === 'flat') {
-                    feeAmount = (Number(fee.amount) || 0) * 100;
-                } else if (fee.type === 'percentage') {
-                    feeAmount = Math.round(discountedSubtotal * ((Number(fee.amount) || 0) / 100));
-                }
-                totalDynamicFees += feeAmount;
-                appliedFees.push({ name: fee.name, amount: feeAmount });
-            }
-        });
-    }
-
-    appliedFees.push({ name: "Taxes (GST)", amount: totalTax });
-
-    // 5. Final Total with zero floor security
-    const finalTotal = Math.max(0, discountedSubtotal + totalTax + totalDynamicFees + adjustmentsTotal);
+    // 5. Final Calculation
+    // Total = bestCostTotal + Tax + materialsTotal - discounts + platformFee + convenienceFee
+    const finalTotal = Math.max(0, taxableBase + totalTax + materialsTotal - discountAmount + platformFee + convenienceFee + adjustmentsTotal);
 
     return {
-        subtotal: taxableSubtotal,
-        discountedSubtotal,
+        subtotal: taxableBase,
         discountAmount,
         taxAmount: totalTax,
-        totalDynamicFees,
         cgst,
         sgst,
         platformFee,
-        appliedFees,
-        appliedDiscounts,
+        convenienceFee,
         materialsTotal,
+        appliedDiscounts,
         finalTotal
     };
 };

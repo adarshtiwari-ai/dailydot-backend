@@ -38,6 +38,7 @@ exports.createBooking = async (req, res) => {
         // Process items and calculate total amount securely
         const detailedItems = [];
         let itemsSubtotal = 0;
+        let bestCostTotal = 0;
 
         for (const item of items) {
             const service = await Service.findById(item.serviceId);
@@ -56,13 +57,14 @@ exports.createBooking = async (req, res) => {
             });
 
             itemsSubtotal += Math.round(service.price) * (item.quantity || 1);
+            bestCostTotal += Math.round(service.bestCostPrice || service.price) * (item.quantity || 1);
         }
 
         const { promoCode } = req.body;
 
         // Centralized Math Engine (Server-Side)
         const { calculateBillDetails } = require("../services/billingService");
-        const billingResult = await calculateBillDetails(itemsSubtotal, [], detailedItems, [], promoCode);
+        const billingResult = await calculateBillDetails(itemsSubtotal, [], detailedItems, [], promoCode, bestCostTotal);
         const {
             taxAmount,
             totalDynamicFees,
@@ -695,7 +697,7 @@ exports.generateInvoice = async (req, res) => {
 // @access  Public
 exports.calculateCheckoutPricing = async (req, res) => {
     try {
-        const { baseCost, items = [], materials = [], adjustments = [], promoCode = null } = req.body;
+        const { baseCost, bestCostTotal, items = [], materials = [], adjustments = [], promoCode = null } = req.body;
 
         if (baseCost === undefined) {
             return res.status(400).json({
@@ -706,8 +708,8 @@ exports.calculateCheckoutPricing = async (req, res) => {
 
         const { calculateBillDetails } = require("../services/billingService");
 
-        // Pass baseCost, adjustments, items, and materials
-        const result = await calculateBillDetails(Number(baseCost), adjustments, items, materials, promoCode);
+        // Pass baseCost, adjustments, items, materials, promoCode, and bestCostTotal
+        const result = await calculateBillDetails(Number(baseCost), adjustments, items, materials, promoCode, bestCostTotal);
 
         // Validation logic for mobile "Apply" button
         if (promoCode && result.appliedDiscounts.length === 0) {

@@ -22,6 +22,10 @@ const serviceSchema = new mongoose.Schema({
   mrp: {
     type: Number
   },
+  bestCostPrice: {
+    type: Number,
+    required: false // Initial migration will set this to current price
+  },
   isStartingPrice: {
     type: Boolean,
     default: false

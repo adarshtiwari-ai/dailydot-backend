@@ -45,9 +45,22 @@ exports.createOrder = async (req, res) => {
             });
         }
 
-        // 4. Secure Amount Calculation (Already in Paise in the database)
-        // Ensure we are using the requested amount or grand total
-        const amountPaise = req.body.amount ? Math.round(req.body.amount) : Math.round(booking.quote?.total || booking.totalAmount);
+        // 4. Secure Amount Calculation — Server-Side Cap (Prevents Payment Spoofing)
+        // Compute true remaining balance from DB fields, never trust the client for this.
+        const grandTotal = Math.round(booking.quote?.total || booking.totalAmount || 0);
+        const alreadyPaid = Math.round(booking.paidAmount || 0);
+        const remainingBalance = Math.max(0, grandTotal - alreadyPaid);
+
+        if (remainingBalance <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "This booking has already been fully paid.",
+            });
+        }
+
+        // Cap client-requested amount — it can NEVER exceed the true remaining balance.
+        const requestedAmount = req.body.amount ? Math.round(req.body.amount) : remainingBalance;
+        const amountPaise = Math.min(requestedAmount, remainingBalance);
 
         if (amountPaise <= 0) {
             return res.status(400).json({

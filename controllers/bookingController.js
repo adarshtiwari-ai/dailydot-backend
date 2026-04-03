@@ -815,9 +815,10 @@ exports.submitQuote = async (req, res) => {
         }, 0);
 
         const subtotal = basePrice + calculatedMaterialsCost;
-        const calculatedTax = Math.round(subtotal * finalTaxRate);
+        // TAX BASE = basePrice ONLY (labor). Materials are supplier costs excluded from GST.
+        const calculatedTax = Math.round(basePrice * finalTaxRate);
         
-        // Derive final total from strict components: (Base + Mat) + Tax + Fees
+        // Derive final total: Base + Materials + Tax(on base only) + Fees
         const strictTotal = subtotal + calculatedTax + finalPlatformFee + finalConvenienceFee;
 
         booking.quote = {

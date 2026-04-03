@@ -785,7 +785,6 @@ exports.submitQuote = async (req, res) => {
         const { totalAmount, breakdown = {}, materials = [], notes } = req.body;
         // Extract adminDiscount as a first-class field (in Paise)
         const adminDiscount = Math.max(0, Math.round(breakdown.adminDiscount || 0));
-        const existingPromoDiscount = booking.discountAmount || 0; // Retention of checkout-side savings
         if (!totalAmount) {
             return res.status(400).json({ success: false, message: "Quote amount is required" });
         }
@@ -794,6 +793,7 @@ exports.submitQuote = async (req, res) => {
         if (!booking) {
             return res.status(404).json({ success: false, message: "Booking not found" });
         }
+        const existingPromoDiscount = booking.discountAmount || 0;
 
         // SAFETY NET: If the frontend sent 0 for fees (race condition), fetch settings as a last resort
         let finalPlatformFee = Math.round(breakdown.platformFee || 0);

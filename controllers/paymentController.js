@@ -163,7 +163,8 @@ exports.verifyPayment = async (req, res) => {
         
         if (booking.paidAmount >= targetTotal) {
             booking.paymentStatus = "paid";
-            booking.status = "confirmed";
+            // If work was in progress or quote approved, it's done. Otherwise, it's a new booking being confirmed.
+            booking.status = (booking.status === 'in_progress' || booking.billingStatus === 'approved') ? 'completed' : 'confirmed';
         } else if (booking.paidAmount > 0) {
             booking.paymentStatus = "partial";
             // Do not force "confirmed" on partial payments if custom status logic is needed
@@ -257,7 +258,8 @@ exports.handleWebhook = async (req, res) => {
                 
                 if (booking.paidAmount >= targetTotal) {
                     booking.paymentStatus = "paid";
-                    booking.status = "confirmed";
+                    // If work was in progress or quote approved, it's done. Otherwise, it's a new booking being confirmed.
+                    booking.status = (booking.status === 'in_progress' || booking.billingStatus === 'approved') ? 'completed' : 'confirmed';
                 } else if (booking.paidAmount > 0) {
                     booking.paymentStatus = "partial";
                 }

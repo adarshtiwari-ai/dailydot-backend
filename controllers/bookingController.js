@@ -81,13 +81,13 @@ exports.createBooking = async (req, res) => {
             detailedItems.push({
                 serviceId: service._id,
                 name: service.name,
-                price: Math.round(service.price * 100),
+                price: Math.round(service.price),
                 quantity: item.quantity || 1,
             });
 
-            // Convert Rupees → Paise before accumulation (CRITICAL: service.price is in Rupees)
-            itemsSubtotal += Math.round(service.price * 100) * (item.quantity || 1);
-            bestCostTotal += Math.round((service.bestCostPrice || service.price) * 100) * (item.quantity || 1);
+            // Accumulate itemsSubtotal and bestCostPrice in Paise (no conversion needed as DB is now unified)
+            itemsSubtotal += Math.round(service.price) * (item.quantity || 1);
+            bestCostTotal += Math.round((service.bestCostPrice || service.price)) * (item.quantity || 1);
         }
 
         const { promoCode } = req.body;

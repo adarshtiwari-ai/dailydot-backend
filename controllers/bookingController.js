@@ -234,10 +234,10 @@ exports.updateBookingStatus = async (req, res) => {
         let assignedProId = null;
         let finalStatus = status;
 
-        // Logic for ID-Based Professional Assignment
+        // Logic for ID-Based Professional Assignment (Strict State Dominance)
         if (professionalId) {
             assignedProId = professionalId;
-            finalStatus = "assigned"; // State Alignment: explicitly set to 'assigned'
+            finalStatus = "assigned"; // VOIOLENT OVERRIDE: Assignment ALWAYS forces 'assigned' status
         } else if (status === "confirmed" && proName && proPhone) {
             // DEPRECATED FALLBACK: Legacy lookup (keeping for temporary backward compatibility)
             const Professional = require("../models/Professional");

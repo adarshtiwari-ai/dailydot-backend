@@ -85,8 +85,9 @@ exports.createBooking = async (req, res) => {
                 quantity: item.quantity || 1,
             });
 
-            itemsSubtotal += Math.round(service.price) * (item.quantity || 1);
-            bestCostTotal += Math.round(service.bestCostPrice || service.price) * (item.quantity || 1);
+            // Convert Rupees → Paise before accumulation (CRITICAL: service.price is in Rupees)
+            itemsSubtotal += Math.round(service.price * 100) * (item.quantity || 1);
+            bestCostTotal += Math.round((service.bestCostPrice || service.price) * 100) * (item.quantity || 1);
         }
 
         const { promoCode } = req.body;
@@ -782,6 +783,8 @@ exports.calculateCheckoutPricing = async (req, res) => {
 exports.submitQuote = async (req, res) => {
     try {
         const { totalAmount, breakdown = {}, materials = [], notes } = req.body;
+        // Extract adminDiscount as a first-class field (in Paise)
+        const adminDiscount = Math.max(0, Math.round(breakdown.adminDiscount || 0));
         if (!totalAmount) {
             return res.status(400).json({ success: false, message: "Quote amount is required" });
         }
@@ -818,8 +821,9 @@ exports.submitQuote = async (req, res) => {
         // TAX BASE = basePrice ONLY (labor). Materials are supplier costs excluded from GST.
         const calculatedTax = Math.round(basePrice * finalTaxRate);
         
-        // Derive final total: Base + Materials + Tax(on base only) + Fees
-        const strictTotal = subtotal + calculatedTax + finalPlatformFee + finalConvenienceFee;
+        // Derive final total: Base + Materials + Tax(on base only) + Fees - Admin Discount
+        // Math.max(0, ...) floor guard prevents negative invoices
+        const strictTotal = Math.max(0, subtotal + calculatedTax + finalPlatformFee + finalConvenienceFee - adminDiscount);
 
         booking.quote = {
             basePrice,
@@ -834,6 +838,7 @@ exports.submitQuote = async (req, res) => {
             })),
             platformFee: finalPlatformFee,
             convenienceFee: finalConvenienceFee,
+            adminDiscount, // First-class labeled discount (not disguised as negative material)
             total: strictTotal,
             isApproved: false
         };

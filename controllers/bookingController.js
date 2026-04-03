@@ -16,6 +16,46 @@ exports.createBooking = async (req, res) => {
     console.log("--- NEW BOOKING REQUEST RECEIVED ---");
     console.log("Body:", req.body);
     try {
+        const { 
+            bookingId, // Check for existing booking ID (Idempotency)
+            items, 
+            scheduledDate, 
+            scheduledTime, 
+            serviceAddress, 
+            name, 
+            phone, 
+            notes, 
+            bookingType, 
+            paymentMethod,
+            amount // Partial payment amount
+        } = req.body;
+
+        // 1. Partial Payment Validation (₹50 Minimum)
+        const numericAmount = Number(amount || 0);
+        if (paymentMethod === 'online' && numericAmount > 0 && numericAmount < 50) {
+            return res.status(400).json({
+                success: false,
+                message: "Minimum payment of ₹50 is required for online transactions."
+            });
+        }
+
+        // 2. ID-Aware Routing (Upsert/Idempotent Logic)
+        if (bookingId) {
+            const existingBooking = await Booking.findById(bookingId);
+            if (existingBooking) {
+                // Update payment method if it changed
+                if (paymentMethod) existingBooking.paymentMethod = paymentMethod;
+                await existingBooking.save();
+
+                return res.status(200).json({
+                    success: true,
+                    message: "Existing booking updated",
+                    booking: existingBooking,
+                });
+            }
+        }
+
+        // 3. New Booking Logic
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(400).json({
@@ -23,17 +63,6 @@ exports.createBooking = async (req, res) => {
                 errors: errors.array(),
             });
         }
-
-        const {
-            items,
-            scheduledDate,
-            scheduledTime,
-            serviceAddress,
-            notes,
-            name,
-            phone,
-            bookingType,
-        } = req.body;
 
         // Process items and calculate total amount securely
         const detailedItems = [];
@@ -778,9 +807,9 @@ exports.submitQuote = async (req, res) => {
         }
 
         booking.quote = {
-            basePrice: Math.round(breakdown.basePrice || 0),
+            basePrice: Math.round(breakdown.basePrice || booking.baseCost || 0),
             tax: Math.round(breakdown.tax || 0),
-            taxRate: finalTaxRate, // Locking the rate for this specific quote
+            taxRate: finalTaxRate, 
             materials: Math.round(breakdown.materials || 0),
             materialsList: materials.map(m => ({ name: m.name, cost: Math.round(m.cost) })),
             platformFee: finalPlatformFee,
@@ -869,7 +898,7 @@ exports.approveQuote = async (req, res) => {
 
         // 2. Backend Admin Broadcast (Socket)
         eventHub.emit("BOOKING_STATUS_UPDATED", {
-            bookingId: booking._id,
+            booking,
             status: 'confirmed'
         });
 
@@ -922,7 +951,7 @@ exports.recordPayment = async (req, res) => {
 
         if (fullyPaid) {
             const eventHub = require("../services/event.service");
-            eventHub.emit("BOOKING_STATUS_UPDATED", { bookingId: booking._id, status: 'completed' });
+            eventHub.emit("BOOKING_STATUS_UPDATED", { booking, status: 'completed' });
         }
 
         res.json({

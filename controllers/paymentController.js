@@ -46,8 +46,8 @@ exports.createOrder = async (req, res) => {
         }
 
         // 4. Secure Amount Calculation (Already in Paise in the database)
-        // Ensure we are using the grand total calculated by the Math Engine
-        const amountPaise = Math.round(booking.totalAmount);
+        // Ensure we are using the requested amount or grand total
+        const amountPaise = req.body.amount ? Math.round(req.body.amount) : Math.round(booking.quote?.total || booking.totalAmount);
 
         if (amountPaise <= 0) {
             return res.status(400).json({
@@ -121,8 +121,11 @@ exports.verifyPayment = async (req, res) => {
             });
         }
 
-        // 2. Update Booking Status
-        // Find booking by Razorpay Order ID
+        // 2. Fetch order details from Razorpay to get the exact amount paid
+        const razorpayOrder = await razorpay.orders.fetch(razorpay_order_id);
+        const incomingAmount = razorpayOrder.amount;
+
+        // 3. Update Ledger: Atomic Increment & Installment Push
         const booking = await Booking.findOne({ paymentOrderId: razorpay_order_id });
 
         if (!booking) {
@@ -132,8 +135,27 @@ exports.verifyPayment = async (req, res) => {
             });
         }
 
-        booking.paymentStatus = "paid";
-        booking.status = "confirmed";
+        booking.paidAmount = (booking.paidAmount || 0) + incomingAmount;
+        
+        booking.installments.push({
+            amount: incomingAmount,
+            method: 'online',
+            transactionId: razorpay_payment_id,
+            status: 'paid',
+            paidAt: Date.now()
+        });
+
+        // 4. Status Progression
+        const targetTotal = booking.quote?.total || booking.totalAmount;
+        
+        if (booking.paidAmount >= targetTotal) {
+            booking.paymentStatus = "paid";
+            booking.status = "confirmed";
+        } else if (booking.paidAmount > 0) {
+            booking.paymentStatus = "partial";
+            // Do not force "confirmed" on partial payments if custom status logic is needed
+        }
+
         booking.paymentId = razorpay_payment_id;
         booking.paidAt = Date.now();
         await booking.save();
@@ -206,8 +228,27 @@ exports.handleWebhook = async (req, res) => {
             const booking = await Booking.findOne({ paymentOrderId: orderId });
 
             if (booking && booking.paymentStatus !== "paid") {
-                booking.paymentStatus = "paid";
-                booking.status = "confirmed";
+                const incomingAmount = entity.amount;
+
+                booking.paidAmount = (booking.paidAmount || 0) + incomingAmount;
+                
+                booking.installments.push({
+                    amount: incomingAmount,
+                    method: 'online',
+                    transactionId: paymentId,
+                    status: 'paid',
+                    paidAt: Date.now()
+                });
+
+                const targetTotal = booking.quote?.total || booking.totalAmount;
+                
+                if (booking.paidAmount >= targetTotal) {
+                    booking.paymentStatus = "paid";
+                    booking.status = "confirmed";
+                } else if (booking.paidAmount > 0) {
+                    booking.paymentStatus = "partial";
+                }
+
                 if (paymentId) booking.paymentId = paymentId;
                 booking.paidAt = Date.now();
                 await booking.save();

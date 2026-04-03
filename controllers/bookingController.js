@@ -806,22 +806,23 @@ exports.submitQuote = async (req, res) => {
             }
         }
 
-        // 1. STRICT SERVER-SIDE MATH ENGINE
+        // 1. STRICT SERVER-SIDE MATH ENGINE (Raw Base + Materials)
+        const basePrice = Math.round(breakdown.basePrice || booking.baseCost || 0);
         const calculatedMaterialsCost = materials.reduce((sum, m) => {
             const itemPrice = Number(m.price || m.cost || 0);
             const itemQty = Number(m.qty || 1);
             return sum + (itemPrice * itemQty);
         }, 0);
 
-        const basePrice = Math.round(breakdown.basePrice || booking.baseCost || 0);
-        const tax = Math.round(breakdown.tax || 0);
-
-        // Derive strict total from individual components
-        const strictTotal = Math.round(basePrice + calculatedMaterialsCost + finalPlatformFee + finalConvenienceFee + tax);
+        const subtotal = basePrice + calculatedMaterialsCost;
+        const calculatedTax = Math.round(subtotal * finalTaxRate);
+        
+        // Derive final total from strict components: (Base + Mat) + Tax + Fees
+        const strictTotal = subtotal + calculatedTax + finalPlatformFee + finalConvenienceFee;
 
         booking.quote = {
             basePrice,
-            tax,
+            tax: calculatedTax,
             taxRate: finalTaxRate, 
             materials: Math.round(calculatedMaterialsCost),
             materialsList: materials.map(m => ({ 
@@ -836,9 +837,11 @@ exports.submitQuote = async (req, res) => {
             isApproved: false
         };
         
-        // Atomic Materials Overwrite
+        // Atomic Sync
         booking.materials = booking.quote.materialsList;
-        booking.totalAmount = strictTotal; // Lock global total to strict math
+        booking.totalAmount = strictTotal; // Force global lock to strict math
+        booking.taxAmount = calculatedTax;
+        booking.subtotal = subtotal;
 
         // Unified State Alignment
         booking.billingStatus = 'quote_sent';
@@ -846,10 +849,6 @@ exports.submitQuote = async (req, res) => {
         
         if (notes !== undefined) booking.notes = notes;
         
-        // SYNC: Ensure Grand Total and Final Total are locked to the quote amount
-        booking.totalAmount = Math.round(totalAmount);
-        booking.finalTotal = Math.round(totalAmount);
-
         // PERSISTENCE: Strict await before any side effects (like push notifications)
         await booking.save();
 

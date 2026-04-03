@@ -130,7 +130,12 @@ const bookingSchema = new mongoose.Schema(
       tax: { type: Number, default: 0 },
       taxRate: { type: Number }, // Historical lock: the GST rate used at time of quote
       materials: { type: Number, default: 0 },
-      materialsList: [{ name: String, cost: Number }],
+      materialsList: [{ 
+        name: String, 
+        price: { type: Number, default: 0 }, 
+        qty: { type: Number, default: 1 }, 
+        cost: Number 
+      }],
       platformFee: { type: Number, default: 0 },
       convenienceFee: { type: Number, default: 0 },
       total: { type: Number, default: 0 },
@@ -150,6 +155,8 @@ const bookingSchema = new mongoose.Schema(
       {
         name: { type: String, required: true },
         cost: { type: Number, set: v => Math.round(v), required: true },
+        price: { type: Number, default: 0 },
+        qty: { type: Number, default: 1 },
         addedAt: { type: Date, default: Date.now }
       }
     ],

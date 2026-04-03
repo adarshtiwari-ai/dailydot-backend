@@ -806,20 +806,39 @@ exports.submitQuote = async (req, res) => {
             }
         }
 
+        // 1. STRICT SERVER-SIDE MATH ENGINE
+        const calculatedMaterialsCost = materials.reduce((sum, m) => {
+            const itemPrice = Number(m.price || m.cost || 0);
+            const itemQty = Number(m.qty || 1);
+            return sum + (itemPrice * itemQty);
+        }, 0);
+
+        const basePrice = Math.round(breakdown.basePrice || booking.baseCost || 0);
+        const tax = Math.round(breakdown.tax || 0);
+
+        // Derive strict total from individual components
+        const strictTotal = Math.round(basePrice + calculatedMaterialsCost + finalPlatformFee + finalConvenienceFee + tax);
+
         booking.quote = {
-            basePrice: Math.round(breakdown.basePrice || booking.baseCost || 0),
-            tax: Math.round(breakdown.tax || 0),
+            basePrice,
+            tax,
             taxRate: finalTaxRate, 
-            materials: Math.round(breakdown.materials || 0),
-            materialsList: materials.map(m => ({ name: m.name, cost: Math.round(m.cost) })),
+            materials: Math.round(calculatedMaterialsCost),
+            materialsList: materials.map(m => ({ 
+                name: m.name, 
+                price: Math.round(m.price || m.cost || 0), 
+                qty: Number(m.qty || 1),
+                cost: Math.round((m.price || m.cost || 0) * (m.qty || 1))
+            })),
             platformFee: finalPlatformFee,
             convenienceFee: finalConvenienceFee,
-            total: Math.round(totalAmount),
+            total: strictTotal,
             isApproved: false
         };
         
         // Atomic Materials Overwrite
-        booking.materials = materials.map(m => ({ name: m.name, cost: Math.round(m.cost) }));
+        booking.materials = booking.quote.materialsList;
+        booking.totalAmount = strictTotal; // Lock global total to strict math
 
         // Unified State Alignment
         booking.billingStatus = 'quote_sent';

@@ -81,7 +81,7 @@ exports.createBooking = async (req, res) => {
             detailedItems.push({
                 serviceId: service._id,
                 name: service.name,
-                price: Math.round(service.price),
+                price: Math.round(service.price * 100),
                 quantity: item.quantity || 1,
             });
 

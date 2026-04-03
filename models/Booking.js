@@ -24,6 +24,11 @@ const bookingSchema = new mongoose.Schema(
           set: v => Math.round(v),
           required: true,
         },
+        quantity: { 
+          type: Number, 
+          default: 1, 
+          required: true 
+        },
         category: {
           type: String,
           // required: true // Optional if not always available

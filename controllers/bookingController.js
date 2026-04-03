@@ -230,22 +230,22 @@ exports.updateBookingStatus = async (req, res) => {
             });
         }
 
-        const { status, proName, proPhone, materialCost, adminCommission, taxAmount } = req.body;
+        const { status, proName, proPhone, professionalId, materialCost, adminCommission, taxAmount } = req.body;
         let assignedProId = null;
         let finalStatus = status;
 
-        // Logic for Assigning Professional on Confirmation
-        if (status === "confirmed" && proName && proPhone) {
-            // Find pro (Strict Validation - No Ghost Profiles)
-            let pro = await Professional.findOne({ phone: proPhone });
-            if (!pro) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Professional not found with this phone number."
-                });
-            }
-            assignedProId = pro._id;
+        // Logic for ID-Based Professional Assignment
+        if (professionalId) {
+            assignedProId = professionalId;
             finalStatus = "assigned"; // State Alignment: explicitly set to 'assigned'
+        } else if (status === "confirmed" && proName && proPhone) {
+            // DEPRECATED FALLBACK: Legacy lookup (keeping for temporary backward compatibility)
+            const Professional = require("../models/Professional");
+            let pro = await Professional.findOne({ phone: proPhone });
+            if (pro) {
+                assignedProId = pro._id;
+                finalStatus = "assigned";
+            }
         }
 
         const updateData = { status: finalStatus };

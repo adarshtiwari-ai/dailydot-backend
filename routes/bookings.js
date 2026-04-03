@@ -129,8 +129,12 @@ router.patch(
   [auth, adminAuth],
   [
     body("status")
-      .isIn(["pending", "confirmed", "completed", "cancelled"])
+      .isIn(["pending", "confirmed", "assigned", "on_the_way", "in_progress", "completed", "cancelled"])
       .withMessage("Invalid status"),
+    body("professionalId")
+      .optional()
+      .isMongoId()
+      .withMessage("Invalid Professional ID format"),
     body("proName").optional().isString(),
     body("proPhone").optional().isString(),
   ],

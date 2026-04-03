@@ -144,6 +144,7 @@ const bookingSchema = new mongoose.Schema(
       platformFee: { type: Number, default: 0 },
       convenienceFee: { type: Number, default: 0 },
       adminDiscount: { type: Number, default: 0 }, // Admin Courtesy Discount (first-class field, in Paise)
+      totalDiscount: { type: Number, default: 0 }, // Sum of Admin Discount + Original Promo Discount
       total: { type: Number, default: 0 },
       isApproved: { type: Boolean, default: false },
       approvedAt: { type: Date }

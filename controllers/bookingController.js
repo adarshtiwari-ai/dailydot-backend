@@ -785,6 +785,7 @@ exports.submitQuote = async (req, res) => {
         const { totalAmount, breakdown = {}, materials = [], notes } = req.body;
         // Extract adminDiscount as a first-class field (in Paise)
         const adminDiscount = Math.max(0, Math.round(breakdown.adminDiscount || 0));
+        const existingPromoDiscount = booking.discountAmount || 0; // Retention of checkout-side savings
         if (!totalAmount) {
             return res.status(400).json({ success: false, message: "Quote amount is required" });
         }
@@ -821,9 +822,9 @@ exports.submitQuote = async (req, res) => {
         // TAX BASE = basePrice ONLY (labor). Materials are supplier costs excluded from GST.
         const calculatedTax = Math.round(basePrice * finalTaxRate);
         
-        // Derive final total: Base + Materials + Tax(on base only) + Fees - Admin Discount
+        // Derive final total: Base + Materials + Tax(on base only) + Fees - Admin Discount - Promo Discount
         // Math.max(0, ...) floor guard prevents negative invoices
-        const strictTotal = Math.max(0, subtotal + calculatedTax + finalPlatformFee + finalConvenienceFee - adminDiscount);
+        const strictTotal = Math.max(0, subtotal + calculatedTax + finalPlatformFee + finalConvenienceFee - adminDiscount - existingPromoDiscount);
 
         booking.quote = {
             basePrice,
@@ -839,6 +840,7 @@ exports.submitQuote = async (req, res) => {
             platformFee: finalPlatformFee,
             convenienceFee: finalConvenienceFee,
             adminDiscount, // First-class labeled discount (not disguised as negative material)
+            totalDiscount: adminDiscount + existingPromoDiscount, // Summed transparency for frontend
             total: strictTotal,
             isApproved: false
         };

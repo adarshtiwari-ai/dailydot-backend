@@ -262,8 +262,21 @@ exports.updateBookingStatus = async (req, res) => {
             updateData.assignedPro = assignedProId;
         }
 
-        // Settlement Data for Completion
+        // V1 STATE INTEGRITY: If completing, we MUST settle before saving the status change
         if (status === "completed" || status === "Completed") {
+            const bookingForStatus = await Booking.findById(req.params.id).populate("assignedPro");
+            
+            if (!bookingForStatus) {
+                return res.status(404).json({ success: false, message: "Booking not found" });
+            }
+
+            if (!bookingForStatus.assignedPro) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: "Cannot complete booking without an assigned professional." 
+                });
+            }
+
             const safeMaterialCost = Number(materialCost) || 0;
             const safeAdminCommission = Number(adminCommission) || 0;
 
@@ -273,12 +286,17 @@ exports.updateBookingStatus = async (req, res) => {
             updateData.taxAmount = Number(taxAmount) || 0;
             updateData.isSettled = true;
 
-            // V1 DUAL-SETTLEMENT PATCH: If it's COD/Cash, force mark as Paid and Cash
-            const bookingForStatus = await Booking.findById(req.params.id);
-            if (bookingForStatus && (bookingForStatus.paymentMethod === 'cod' || bookingForStatus.paymentMethod === 'cash')) {
+            // Mark as Paid for COD/Cash
+            if (bookingForStatus.paymentMethod === 'cod' || bookingForStatus.paymentMethod === 'cash') {
                 updateData.paymentStatus = 'paid';
                 updateData.paymentMethod = 'cash';
             }
+
+            // ATOMIC SETTLEMENT: Attempt wallet math first. If this throws, DB won't update to 'completed'
+            await settlementService.executeSettlement({
+                ...bookingForStatus.toObject(),
+                ...updateData // Merge the final completion data for math accuracy
+            });
         }
 
         const booking = await Booking.findByIdAndUpdate(
@@ -292,19 +310,6 @@ exports.updateBookingStatus = async (req, res) => {
                 success: false,
                 message: "Booking not found",
             });
-        }
-
-        // Validation: Cannot complete/settle without an assigned professional
-        if ((status === 'completed' || status === 'Completed') && !booking.assignedPro) {
-            return res.status(400).json({
-                success: false,
-                message: 'Cannot complete and settle a booking without an assigned professional.'
-            });
-        }
-
-        // Unified Settlement Hook (V1 Dual-Settlement)
-        if (status === "completed" || status === "Completed") {
-            await settlementService.executeSettlement(booking);
         }
 
         res.json({

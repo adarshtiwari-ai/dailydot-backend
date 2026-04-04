@@ -46,8 +46,13 @@ exports.createBooking = async (req, res) => {
         if (bookingId) {
             const existingBooking = await Booking.findById(bookingId);
             if (existingBooking) {
-                // Update payment method if it changed
-                if (paymentMethod) existingBooking.paymentMethod = paymentMethod;
+                // Update payment method if it changed. Force 'pending' status for offline payments.
+                if (paymentMethod === 'cod' || paymentMethod === 'cash') {
+                    existingBooking.paymentMethod = paymentMethod;
+                    existingBooking.paymentStatus = 'pending'; 
+                } else if (paymentMethod) {
+                    existingBooking.paymentMethod = paymentMethod;
+                }
                 await existingBooking.save();
 
                 return res.status(200).json({

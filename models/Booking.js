@@ -106,6 +106,15 @@ const bookingSchema = new mongoose.Schema(
       sgst: { type: Number, set: v => Math.round(v), default: 0 },
       platformFee: { type: Number, set: v => Math.round(v), default: 0 }
     },
+    promoCode: {
+      type: String,
+      default: null,
+      index: true
+    },
+    discountAmount: {
+      type: Number,
+      default: 0
+    },
     finalTotal: {
       type: Number, // stored in paise/cents
       set: v => Math.round(v),
@@ -113,6 +122,11 @@ const bookingSchema = new mongoose.Schema(
         const base = this.subtotal || this.baseCost || this.totalAmount || 0;
         const adjustmentsTotal = (this.adjustments || []).reduce((sum, adj) => sum + adj.amount, 0);
         const materialsTotal = (this.materials || []).reduce((sum, mat) => sum + (mat.cost || 0), 0);
+        
+        // Subtract both appliedDiscounts (Promos) and quote.adminDiscount (Ad-hoc)
+        const appliedDiscountsAmt = (this.appliedDiscounts || []).reduce((sum, disc) => sum + Math.abs(disc.amount || 0), 0);
+        const adminDiscount = this.quote?.adminDiscount || 0;
+        
         const tax = this.taxAmount || 0;
         const sFee = this.serviceFee || 0;
         const cFee = this.convenienceFee || 0;
@@ -122,7 +136,8 @@ const bookingSchema = new mongoose.Schema(
         const sgst = this.taxDetails?.sgst || 0;
         const platformFee = this.taxDetails?.platformFee || 0;
 
-        return base + adjustmentsTotal + materialsTotal + tax + sFee + cFee + cgst + sgst + platformFee;
+        const total = base + adjustmentsTotal + materialsTotal + tax + sFee + cFee + cgst + sgst + platformFee - appliedDiscountsAmt - adminDiscount;
+        return Math.round(Math.max(0, total)); // Ensure it doesn't drop below zero
       }
     },
     billingStatus: {

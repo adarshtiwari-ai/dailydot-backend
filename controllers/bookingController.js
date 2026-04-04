@@ -117,6 +117,8 @@ exports.createBooking = async (req, res) => {
             taxAmount,
             appliedFees,
             appliedDiscounts,
+            promoCode: promoCode || null,
+            discountAmount: Math.abs(discountAmount || 0),
             totalAmount: finalTotal, // Saving the real Grand Total
             baseCost: itemsSubtotal, // Consistency for Invoicing
             name: name || req.user.name,

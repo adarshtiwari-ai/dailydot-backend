@@ -7,7 +7,7 @@ const { validationResult } = require("express-validator");
 const eventHub = require("../services/event.service");
 const { generateInvoicePDF } = require("../services/pdfService");
 const walletService = require("../services/walletService");
-const notificationService = require("../notification.service");
+const notificationService = require("../services/notification.service");
 const settlementService = require("../services/settlementService");
 
 // @desc    Create a new booking

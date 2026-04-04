@@ -28,7 +28,9 @@ exports.createBooking = async (req, res) => {
             notes, 
             bookingType, 
             paymentMethod,
-            amount // Partial payment amount
+            amount, // Partial payment amount
+            promoCode,
+            discountAmount = 0
         } = req.body;
 
         // 1. Partial Payment Validation (₹50 Minimum)
@@ -90,8 +92,6 @@ exports.createBooking = async (req, res) => {
             itemsSubtotal += Math.round(service.price) * (item.quantity || 1);
             bestCostTotal += Math.round((service.bestCostPrice || service.price)) * (item.quantity || 1);
         }
-
-        const { promoCode } = req.body;
 
         // Centralized Math Engine (Server-Side)
         const { calculateBillDetails } = require("../services/billingService");

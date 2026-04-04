@@ -7,7 +7,8 @@ const { validationResult } = require("express-validator");
 const eventHub = require("../services/event.service");
 const { generateInvoicePDF } = require("../services/pdfService");
 const walletService = require("../services/walletService");
-const notificationService = require("../services/notification.service");
+const notificationService = require("../notification.service");
+const settlementService = require("../services/settlementService");
 
 // @desc    Create a new booking
 // @route   POST /api/v1/bookings
@@ -264,6 +265,13 @@ exports.updateBookingStatus = async (req, res) => {
             updateData.netPlatformProfit = safeAdminCommission;
             updateData.taxAmount = Number(taxAmount) || 0;
             updateData.isSettled = true;
+
+            // V1 DUAL-SETTLEMENT PATCH: If it's COD/Cash, force mark as Paid and Cash
+            const bookingForStatus = await Booking.findById(req.params.id);
+            if (bookingForStatus && (bookingForStatus.paymentMethod === 'cod' || bookingForStatus.paymentMethod === 'cash')) {
+                updateData.paymentStatus = 'paid';
+                updateData.paymentMethod = 'cash';
+            }
         }
 
         const booking = await Booking.findByIdAndUpdate(
@@ -287,42 +295,9 @@ exports.updateBookingStatus = async (req, res) => {
             });
         }
 
-        // Provider Debt Ledger Hook (Updated for MANUAL SETTLEMENT)
-        if (
-            (status === "completed" || status === "Completed") &&
-            booking.assignedPro
-        ) {
-            const totalToSplit = booking.finalTotal || booking.totalAmount || 0;
-            const mCost = booking.materialCost || 0;
-            const aComm = booking.adminCommission || 0;
-
-            // The split: Provider Payout = Total - Materials - Commission
-            const providerPayout = totalToSplit - mCost - aComm;
-
-            if (booking.paymentMethod === "cod" || booking.paymentMethod === "cash") {
-                // For COD, the provider already has the cash. 
-                // Platform take-home = Total - Payout = Materials + Commission.
-                // We charge the provider for the platform's share.
-                const platformTakeHome = totalToSplit - providerPayout;
-
-                if (platformTakeHome > 0) {
-                    await walletService.chargePlatformFee(
-                        booking.assignedPro._id || booking.assignedPro,
-                        booking._id,
-                        platformTakeHome
-                    );
-                }
-            } else {
-                // For Online payments, platform has the cash. 
-                // We credit the provider their specific payout.
-                if (providerPayout > 0) {
-                    await walletService.creditOnlinePayout(
-                        booking.assignedPro._id || booking.assignedPro,
-                        booking._id,
-                        providerPayout
-                    );
-                }
-            }
+        // Unified Settlement Hook (V1 Dual-Settlement)
+        if (status === "completed" || status === "Completed") {
+            await settlementService.executeSettlement(booking);
         }
 
         res.json({
@@ -978,6 +953,9 @@ exports.recordPayment = async (req, res) => {
         if (fullyPaid) {
             const eventHub = require("../services/event.service");
             eventHub.emit("BOOKING_STATUS_UPDATED", { booking, status: 'completed' });
+            
+            // Trigger Settlement on Payment Completion
+            await settlementService.executeSettlement(booking);
         }
 
         res.json({

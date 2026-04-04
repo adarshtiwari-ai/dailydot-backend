@@ -3,6 +3,7 @@ const razorpay = require("../config/razorpay");
 const Booking = require("../models/Booking");
 const { validationResult } = require("express-validator");
 const eventHub = require("../services/event.service");
+const settlementService = require("../services/settlementService");
 
 /**
  * @desc    Create a Razorpay order
@@ -174,6 +175,11 @@ exports.verifyPayment = async (req, res) => {
         booking.paidAt = Date.now();
         await booking.save();
 
+        // 4.5. Unified Settlement Hook (V1 Dual-Settlement)
+        if (booking.status === 'completed') {
+            await settlementService.executeSettlement(booking);
+        }
+
         // 3. Trust Engine: Verify past/future user reviews
         const Review = require("../models/Review");
         try {
@@ -267,6 +273,11 @@ exports.handleWebhook = async (req, res) => {
                 if (paymentId) booking.paymentId = paymentId;
                 booking.paidAt = Date.now();
                 await booking.save();
+
+                // Unified Settlement Hook (V1 Dual-Settlement)
+                if (booking.status === 'completed') {
+                    await settlementService.executeSettlement(booking);
+                }
 
                 // Trust Engine: Verify all associated reviews for this user
                 const Review = require("../models/Review");

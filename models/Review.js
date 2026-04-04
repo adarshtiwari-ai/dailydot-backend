@@ -249,31 +249,35 @@ reviewSchema.statics.calcAverageRatings = async function (serviceId, providerId)
 
     // 2. Update Professional Ratings (Provider)
     if (providerId) {
-      const proStats = await this.aggregate([
-        {
-          $match: {
-            providerId: new mongoose.Types.ObjectId(providerId),
+      try {
+        const proStats = await this.aggregate([
+          {
+            $match: {
+              providerId: new mongoose.Types.ObjectId(providerId.toString()),
+            },
           },
-        },
-        {
-          $group: {
-            _id: "$providerId",
-            nRating: { $sum: 1 },
-            avgRating: { $avg: "$providerRating" },
+          {
+            $group: {
+              _id: "$providerId",
+              nRating: { $sum: 1 },
+              avgRating: { $avg: "$providerRating" },
+            },
           },
-        },
-      ]);
+        ]);
 
-      if (proStats.length > 0) {
-        await Professional.findByIdAndUpdate(providerId, {
-          totalRatings: proStats[0].nRating || 0,
-          averageRating: proStats[0].avgRating ? Number(proStats[0].avgRating.toFixed(1)) : 0,
-        });
-      } else {
-        await Professional.findByIdAndUpdate(providerId, {
-          totalRatings: 0,
-          averageRating: 0,
-        });
+        if (proStats.length > 0) {
+          await Professional.findByIdAndUpdate(providerId, {
+            totalRatings: proStats[0].nRating || 0,
+            averageRating: proStats[0].avgRating ? Number(proStats[0].avgRating.toFixed(1)) : 0,
+          });
+        } else {
+          await Professional.findByIdAndUpdate(providerId, {
+            totalRatings: 0,
+            averageRating: 0,
+          });
+        }
+      } catch (proErr) {
+        console.error(`[ReviewModel] Failed to update Professional ${providerId} stats:`, proErr);
       }
     }
   } catch (error) {

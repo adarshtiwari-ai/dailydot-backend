@@ -144,9 +144,14 @@ router.post(
         });
       }
 
-      // Safely extract from the items array
+      // Safely extract from the items array and assignedPro
       const extractedServiceId = serviceId || booking.items?.[0]?.serviceId || booking.items?.[0]?._id;
-      const extractedProviderId = booking.assignedPro?._id || booking.assignedPro || booking.providerId;
+      
+      // Atomic extraction: Support both populated object and raw ID
+      const extractedProviderId = booking.assignedPro?._id || 
+                                  (typeof booking.assignedPro === 'string' ? booking.assignedPro : null) || 
+                                  booking.providerId || 
+                                  null;
 
       // Create review
       const review = await Review.create({

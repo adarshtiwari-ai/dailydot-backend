@@ -817,6 +817,7 @@ exports.submitQuote = async (req, res) => {
             platformFee: finalPlatformFee,
             convenienceFee: finalConvenienceFee,
             adminDiscount, // First-class labeled discount (not disguised as negative material)
+            promoDiscount: existingPromoDiscount, // PROMO EXPLICIT SYNC: Map the customer's original promo here
             totalDiscount: adminDiscount + existingPromoDiscount, // Summed transparency for frontend
             total: strictTotal,
             isApproved: false

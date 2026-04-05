@@ -78,6 +78,17 @@ exports.createBooking = async (req, res) => {
         let bestCostTotal = 0;
 
         for (const item of items) {
+            // Consultation Bypass: Skip DB lookup for non-catalog expert items
+            if (bookingType === 'consultation' && !item.serviceId) {
+                detailedItems.push({
+                    serviceId: null,
+                    name: item.name || 'Expert Consultation',
+                    price: 0,
+                    quantity: 1,
+                });
+                continue; 
+            }
+
             const service = await Service.findById(item.serviceId);
             if (!service) {
                 return res.status(404).json({

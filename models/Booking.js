@@ -167,7 +167,7 @@ const bookingSchema = new mongoose.Schema(
     installments: [
       {
         amount: { type: Number, required: true },
-        method: { type: String, enum: ['online', 'cod'], default: 'online' },
+        method: { type: String, enum: ['online', 'cod', 'cash'], default: 'online' },
         transactionId: String,
         status: { type: String, enum: ['pending', 'paid', 'failed'], default: 'paid' },
         paidAt: { type: Date, default: Date.now }
@@ -245,7 +245,7 @@ const bookingSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["card", "upi", "netbanking", "wallet", "cod", "online", null],
+      enum: ["card", "upi", "netbanking", "wallet", "cod", "online", "cash", null],
       default: null,
     },
     paidAt: {

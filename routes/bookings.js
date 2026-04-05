@@ -49,7 +49,10 @@ router.post(
   auth,
   [
     body("items").isArray({ min: 1 }).withMessage("At least one item is required"),
-    body("items.*.serviceId").notEmpty().withMessage("Service ID is required"),
+    body("items.*.serviceId")
+      .if((value, { req }) => req.body.bookingType !== "consultation")
+      .notEmpty()
+      .withMessage("Service ID is required"),
     body("scheduledDate").isISO8601().withMessage("Valid date is required"),
     body("scheduledTime").notEmpty().withMessage("Time slot is required"),
     body("serviceAddress.addressLine1").notEmpty().withMessage("Address is required"),

@@ -281,6 +281,13 @@ exports.updateBookingStatus = async (req, res) => {
                 return res.status(404).json({ success: false, message: "Booking not found" });
             }
 
+            // OTP VERIFICATION (Strict Type-Safe) - Hardening: Verify client-provided OTP before allowing completion
+            const providedOtp = String(req.body.otp || '').trim();
+            const storedOtp = String(bookingForStatus.otp || '').trim();
+            if (!providedOtp || providedOtp !== storedOtp) {
+                return res.status(400).json({ success: false, message: "Invalid Completion OTP" });
+            }
+
             if (!bookingForStatus.assignedPro) {
                 return res.status(400).json({ 
                     success: false, 

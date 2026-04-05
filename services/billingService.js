@@ -56,6 +56,7 @@ const calculateBillDetails = async (baseCost, adjustments = [], items = [], mate
                 const eligibleTotal = items
                     .filter(item => {
                         const sId = item.serviceId?._id || item.serviceId || item.id;
+                        if (!sId) return false; // Safe bypass for consultations
                         return discount.applicableServices.some(asId => asId.toString() === sId.toString());
                     })
                     .reduce((sum, item) => sum + (Number(item.price) || 0), 0);

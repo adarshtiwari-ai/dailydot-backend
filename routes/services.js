@@ -59,11 +59,14 @@ router.get("/", async (req, res) => {
     if (section) {
       query.section = section;
     }
-    if (search) {
+    // Extract string if it was accidentally sent as an object ?search[query]=
+    const searchString = typeof search === 'object' ? search.query : search;
+
+    if (searchString && typeof searchString === 'string') {
       query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-        { searchTags: { $regex: search, $options: "i" } },
+        { name: { $regex: searchString, $options: "i" } },
+        { description: { $regex: searchString, $options: "i" } },
+        { searchTags: { $regex: searchString, $options: "i" } },
       ];
     }
 

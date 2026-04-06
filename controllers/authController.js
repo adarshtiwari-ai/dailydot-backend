@@ -72,6 +72,11 @@ exports.firebaseLogin = async (req, res) => {
             });
         }
 
+        // Log the login event
+        user.lastLogin = new Date();
+        user.loginIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+        await user.save();
+
         const { accessToken, refreshToken } = generateTokens(user);
 
         res.status(200).json({
@@ -201,6 +206,11 @@ exports.socialLogin = async (req, res) => {
             user = await User.create(userData);
         }
 
+        // Log the login event
+        user.lastLogin = new Date();
+        user.loginIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+        await user.save();
+
         const { accessToken, refreshToken } = generateTokens(user);
 
         res.status(200).json({
@@ -250,6 +260,11 @@ exports.login = async (req, res) => {
         if (!isMatch) {
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
+
+        // Log the login event
+        user.lastLogin = new Date();
+        user.loginIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+        await user.save();
 
         const { accessToken, refreshToken } = generateTokens(user);
 
@@ -362,6 +377,11 @@ exports.deviceLogin = async (req, res) => {
         if (!user) {
             return res.json({ success: true, isGuest: true, message: 'New device' });
         }
+
+        // Log the login event
+        user.lastLogin = new Date();
+        user.loginIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+        await user.save();
 
         const { accessToken, refreshToken } = generateTokens(user);
         res.json({

@@ -95,6 +95,14 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  lastLogin: {
+    type: Date,
+    default: null
+  },
+  loginIP: {
+    type: String,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now

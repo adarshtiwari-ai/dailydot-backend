@@ -137,8 +137,8 @@ exports.createBooking = async (req, res) => {
             discountAmount: Math.abs(discountAmount || 0),
             totalAmount: finalTotal, // Saving the real Grand Total
             baseCost: itemsSubtotal, // Consistency for Invoicing
-            name: name || req.user.name,
-            phone: phone || req.user.phone,
+            name: name || null,
+            phone: phone || null,
             notes,
             bookingType: bookingType || 'standard',
             paymentMethod: "cod",

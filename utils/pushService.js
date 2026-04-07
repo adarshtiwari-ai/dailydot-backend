@@ -32,6 +32,9 @@ const sendPushNotification = async (userIds, title, body, data = {}) => {
             title: title,
             body: body,
             data: data,
+            priority: 'high',
+            channelId: 'default',
+            _displayInForeground: true
         }));
 
         // Map tokens to user IDs for pruning (using the first user found for that token)

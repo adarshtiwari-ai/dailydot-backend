@@ -223,7 +223,9 @@ router.patch(
  *     summary: Get all bookings (Admin only)
  *     tags: [Bookings]
  */
+router.patch("/:id/add-services", [auth, adminAuth], bookingController.addServicesToBooking);
 router.get("/", [auth, adminAuth], bookingController.getAllBookings);
+
 
 /**
  * @swagger

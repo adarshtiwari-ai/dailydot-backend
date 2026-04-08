@@ -1000,3 +1000,86 @@ exports.recordPayment = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+// @desc    Add service(s) to existing booking (Admin only)
+// @route   PATCH /api/v1/bookings/:id/add-services
+// @access  Private (Admin)
+exports.addServicesToBooking = async (req, res) => {
+    try {
+        const { newServices } = req.body;
+
+        if (!newServices || !Array.isArray(newServices) || newServices.length === 0) {
+            return res.status(400).json({ success: false, message: "Valid newServices array is required" });
+        }
+
+        const booking = await Booking.findById(req.params.id);
+        if (!booking) {
+            return res.status(404).json({ success: false, message: "Booking not found" });
+        }
+
+        // Push new services into existing items array
+        // TRUST THE INPUT: Price MUST be in paise from frontend, NO * 100 multiplication here!
+        for (const service of newServices) {
+            booking.items.push({
+                serviceId: service.serviceId,
+                name: service.name,
+                price: Math.round(Number(service.price)),
+                quantity: service.quantity || 1,
+                category: service.category || undefined
+            });
+        }
+
+        // Calculate the new itemsSubtotal
+        let itemsSubtotal = 0;
+        let bestCostTotal = 0;
+        
+        for (const item of booking.items) {
+           const itemTotal = Math.round(Number(item.price)) * Number(item.quantity || 1);
+           itemsSubtotal += itemTotal;
+           bestCostTotal += itemTotal; 
+        }
+
+        // Call billingService to regenerate totals
+        const { calculateBillDetails } = require("../services/billingService");
+        
+        const adjustments = booking.quote?.adminDiscount > 0 ? [{ reason: "Admin Discount", amount: -(booking.quote.adminDiscount) }] : [];
+        const materials = booking.materials || [];
+        const promoCode = booking.promoCode || null;
+
+        const billingResult = await calculateBillDetails(
+            itemsSubtotal, 
+            adjustments, 
+            booking.items, 
+            materials, 
+            promoCode, 
+            bestCostTotal
+        );
+
+        // Update booking totals dynamically
+        booking.subtotal = itemsSubtotal;
+        booking.baseCost = itemsSubtotal;
+        booking.taxAmount = billingResult.taxAmount;
+        booking.totalAmount = billingResult.finalTotal;
+        booking.appliedFees = billingResult.appliedFees;
+        booking.appliedDiscounts = billingResult.appliedDiscounts;
+
+        // Sync quote object if it exists
+        if (booking.quote && (booking.quote.total > 0 || booking.quote.basePrice > 0)) {
+             booking.quote.basePrice = itemsSubtotal;
+             booking.quote.tax = billingResult.taxAmount;
+             booking.quote.total = billingResult.finalTotal;
+        }
+
+        await booking.save();
+
+        res.json({
+            success: true,
+            message: "Services added and billing recalculated successfully",
+            booking
+        });
+
+    } catch (error) {
+        console.error("Error adding services to booking:", error);
+        res.status(500).json({ success: false, message: "Failed to add services." });
+    }
+};

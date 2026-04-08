@@ -1030,7 +1030,7 @@ exports.addServicesToBooking = async (req, res) => {
         let bestCostTotal = 0;
         
         for (const item of booking.items) {
-           const itemTotal = Math.round(Number(item.price)) * Number(item.quantity || 1);
+           const itemTotal = Math.round( Number(item.price) * Number(item.quantity || 1) );
            itemsSubtotal += itemTotal;
            bestCostTotal += itemTotal; 
         }

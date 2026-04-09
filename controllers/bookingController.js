@@ -250,7 +250,7 @@ exports.updateBookingStatus = async (req, res) => {
             });
         }
 
-        const { status, proName, proPhone, professionalId, materialCost, adminCommission, taxAmount } = req.body;
+        const { status, proName, proPhone, professionalId, materialCost, adminCommission, taxAmount, materials, adminDiscount } = req.body;
         let assignedProId = null;
         let finalStatus = status;
 
@@ -279,6 +279,13 @@ exports.updateBookingStatus = async (req, res) => {
         const updateData = { status: finalStatus };
         if (assignedProId) {
             updateData.assignedPro = assignedProId;
+        }
+
+        // PERSISTENCE SYNC: Capture materials array and adminDiscount during status changes
+        if (materials !== undefined) updateData.materials = materials;
+        if (adminDiscount !== undefined) {
+            updateData.adminDiscount = adminDiscount;
+            updateData.discountAmount = adminDiscount + (bookingForStatus?.discountAmount || 0); // Aggregate sync
         }
 
         // V1 STATE INTEGRITY: If completing, we MUST settle before saving the status change
@@ -791,9 +798,10 @@ exports.calculateCheckoutPricing = async (req, res) => {
 // @access  Private (Admin)
 exports.submitQuote = async (req, res) => {
     try {
-        const { totalAmount, breakdown = {}, materials = [], notes } = req.body;
-        // Extract adminDiscount as a first-class field (in Paise)
-        const adminDiscount = Math.max(0, Math.round(breakdown.adminDiscount || 0));
+        const { totalAmount, breakdown = {}, notes } = req.body;
+        // Robust Extraction Fallback (checks both root and breakdown levels)
+        const adminDiscount = Math.max(0, Math.round(req.body.adminDiscount || breakdown?.adminDiscount || 0));
+        const materialsInput = req.body.materials || breakdown?.materials || [];
         if (!totalAmount) {
             return res.status(400).json({ success: false, message: "Quote amount is required" });
         }
@@ -807,7 +815,7 @@ exports.submitQuote = async (req, res) => {
         const { calculateBillDetails } = require("../services/billingService");
         
         const basePrice = Math.round(breakdown.basePrice || booking.baseCost || 0);
-        const materialsList = materials.map(m => ({ 
+        const materialsList = materialsInput.map(m => ({ 
             name: m.name, 
             price: Math.round(m.price || m.cost || 0), 
             qty: Number(m.qty || 1),
@@ -1004,7 +1012,7 @@ exports.recordPayment = async (req, res) => {
 // @access  Private (Admin)
 exports.addServicesToBooking = async (req, res) => {
     try {
-        const { newServices } = req.body;
+        const { newServices, materials: incomingMaterials, adminDiscount } = req.body;
 
         if (!newServices || !Array.isArray(newServices) || newServices.length === 0) {
             return res.status(400).json({ success: false, message: "Valid newServices array is required" });
@@ -1026,6 +1034,10 @@ exports.addServicesToBooking = async (req, res) => {
                 category: service.category || undefined
             });
         }
+
+        // PERSISTENCE SYNC: Explicitly map materials and adminDiscount before recalculating
+        if (incomingMaterials !== undefined) booking.materials = incomingMaterials;
+        if (adminDiscount !== undefined) booking.adminDiscount = adminDiscount;
 
         // Calculate the new itemsSubtotal
         let itemsSubtotal = 0;

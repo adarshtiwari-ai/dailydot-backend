@@ -802,64 +802,58 @@ exports.submitQuote = async (req, res) => {
         if (!booking) {
             return res.status(404).json({ success: false, message: "Booking not found" });
         }
-        const existingPromoDiscount = booking.discountAmount || 0;
 
-        // SAFETY NET: If the frontend sent 0 for fees (race condition), fetch settings as a last resort
-        let finalPlatformFee = Math.round(breakdown.platformFee || 0);
-        let finalConvenienceFee = Math.round(breakdown.convenienceFee || 0);
-        let finalTaxRate = breakdown.taxRate;
-
-        if (finalPlatformFee === 0 || finalConvenienceFee === 0 || finalTaxRate === undefined) {
-            const Setting = require("../models/Setting");
-            const settings = await Setting.findOne();
-            if (settings?.billing) {
-                if (finalPlatformFee === 0) finalPlatformFee = (Number(settings.billing.serviceCharge) || 0) * 100;
-                if (finalConvenienceFee === 0) finalConvenienceFee = (Number(settings.billing.convenienceFee) || 0) * 100;
-                if (finalTaxRate === undefined) finalTaxRate = Number(settings.billing.defaultTaxRate) || 0.18;
-            }
-        }
-
-        // 1. STRICT SERVER-SIDE MATH ENGINE (Raw Base + Materials)
-        const basePrice = Math.round(breakdown.basePrice || booking.baseCost || 0);
-        const calculatedMaterialsCost = materials.reduce((sum, m) => {
-            const itemPrice = Number(m.price || m.cost || 0);
-            const itemQty = Number(m.qty || 1);
-            return sum + (itemPrice * itemQty);
-        }, 0);
-
-        const subtotal = basePrice + calculatedMaterialsCost;
-        // TAX BASE = basePrice ONLY (labor). Materials are supplier costs excluded from GST.
-        const calculatedTax = Math.round(basePrice * finalTaxRate);
+        // 1. UNIFIED MATH ENGINE HANDOFF (SSOT)
+        const { calculateBillDetails } = require("../services/billingService");
         
-        // Derive final total: Base + Materials + Tax(on base only) + Fees - Admin Discount - Promo Discount
-        // Math.max(0, ...) floor guard prevents negative invoices
-        const strictTotal = Math.max(0, subtotal + calculatedTax + finalPlatformFee + finalConvenienceFee - adminDiscount - existingPromoDiscount);
+        const basePrice = Math.round(breakdown.basePrice || booking.baseCost || 0);
+        const materialsList = materials.map(m => ({ 
+            name: m.name, 
+            price: Math.round(m.price || m.cost || 0), 
+            qty: Number(m.qty || 1),
+            cost: Math.round((m.price || m.cost || 0) * (m.qty || 1))
+        }));
 
-        booking.quote = {
+        // Adjustments for the engine (Courtesy override)
+        const adjustments = adminDiscount > 0 
+            ? [{ reason: "Admin Discount", amount: -adminDiscount }] 
+            : [];
+
+        // Route through the centralized math engine
+        const billDetails = await calculateBillDetails(
             basePrice,
-            tax: calculatedTax,
-            taxRate: finalTaxRate, 
-            materials: Math.round(calculatedMaterialsCost),
-            materialsList: materials.map(m => ({ 
-                name: m.name, 
-                price: Math.round(m.price || m.cost || 0), 
-                qty: Number(m.qty || 1),
-                cost: Math.round((m.price || m.cost || 0) * (m.qty || 1))
-            })),
-            platformFee: finalPlatformFee,
-            convenienceFee: finalConvenienceFee,
-            adminDiscount, // First-class labeled discount (not disguised as negative material)
-            promoDiscount: existingPromoDiscount, // PROMO EXPLICIT SYNC: Map the customer's original promo here
-            totalDiscount: adminDiscount + existingPromoDiscount, // Summed transparency for frontend
-            total: strictTotal,
+            adjustments,
+            booking.items,
+            materialsList,
+            booking.promoCode,
+            basePrice // Taxable Base: Use the assessment price for GST calculation
+        );
+
+        // 2. QUOTE PERSISTENCE
+        booking.quote = {
+            basePrice: billDetails.subtotal,
+            tax: billDetails.taxAmount,
+            taxRate: billDetails.taxRate, 
+            materials: billDetails.materialsTotal,
+            materialsList: materialsList,
+            platformFee: billDetails.platformFee,
+            convenienceFee: billDetails.convenienceFee,
+            adminDiscount: adminDiscount,
+            promoDiscount: billDetails.discountAmount,
+            totalDiscount: adminDiscount + billDetails.discountAmount,
+            total: billDetails.finalTotal,
             isApproved: false
         };
         
-        // Atomic Sync
-        booking.materials = booking.quote.materialsList;
-        booking.totalAmount = strictTotal; // Force global lock to strict math
-        booking.taxAmount = calculatedTax;
-        booking.subtotal = subtotal;
+        // 3. CRITICAL: ROOT SYNCHRONIZATION (Mobile App Visibility)
+        booking.materials = materialsList;
+        booking.adminDiscount = adminDiscount;
+        booking.discountAmount = adminDiscount + billDetails.discountAmount; // Aggregate for UI
+        booking.subtotal = billDetails.subtotal + billDetails.materialsTotal; // Combined Subtotal
+        booking.taxAmount = billDetails.taxAmount;
+        booking.totalAmount = billDetails.finalTotal;
+        booking.appliedFees = billDetails.appliedFees || [];
+        booking.appliedDiscounts = billDetails.appliedDiscounts || [];
 
         // Unified State Alignment
         booking.billingStatus = 'quote_sent';
@@ -867,7 +861,7 @@ exports.submitQuote = async (req, res) => {
         
         if (notes !== undefined) booking.notes = notes;
         
-        // PERSISTENCE: Strict await before any side effects (like push notifications)
+        // PERSISTENCE: Strict await before any side effects
         await booking.save();
 
         // Trigger Push Notification to User

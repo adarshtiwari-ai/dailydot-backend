@@ -254,18 +254,21 @@ exports.updateBookingStatus = async (req, res) => {
         let assignedProId = null;
         let finalStatus = status;
 
-        // Logic for ID-Based Professional Assignment (Strict State Dominance)
+        // Logic for ID-Based or Atomic Upsert Assignment
         if (professionalId) {
             assignedProId = professionalId;
             finalStatus = "assigned"; // VOIOLENT OVERRIDE: Assignment ALWAYS forces 'assigned' status
-        } else if (status === "confirmed" && proName && proPhone) {
-            // DEPRECATED FALLBACK: Legacy lookup (keeping for temporary backward compatibility)
-            const Professional = require("../models/Professional");
-            let pro = await Professional.findOne({ phone: proPhone });
-            if (pro) {
-                assignedProId = pro._id;
-                finalStatus = "assigned";
-            }
+        }
+        
+        if (!assignedProId && proPhone && proName) {
+            // ATOMIC UPSERT: Register provider if they don't exist
+            const pro = await Professional.findOneAndUpdate(
+                { phone: proPhone },
+                { name: proName, phone: proPhone },
+                { upsert: true, new: true, setDefaultsOnInsert: true }
+            );
+            assignedProId = pro._id;
+            finalStatus = "assigned";
         }
 
         const updateData = { status: finalStatus };

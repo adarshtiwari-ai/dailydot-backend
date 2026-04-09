@@ -261,14 +261,19 @@ exports.updateBookingStatus = async (req, res) => {
         }
         
         if (!assignedProId && proPhone && proName) {
-            // ATOMIC UPSERT: Register provider if they don't exist
-            const pro = await Professional.findOneAndUpdate(
-                { phone: proPhone },
-                { name: proName, phone: proPhone },
-                { upsert: true, new: true, setDefaultsOnInsert: true }
-            );
-            assignedProId = pro._id;
-            finalStatus = "assigned";
+            try {
+                // ATOMIC UPSERT: Register provider if they don't exist
+                const pro = await Professional.findOneAndUpdate(
+                    { phone: proPhone },
+                    { name: proName, phone: proPhone },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+                assignedProId = pro._id;
+                finalStatus = "assigned";
+            } catch (error) {
+                console.error("UPSERT DATABASE ERROR:", JSON.stringify(error.errors || error, null, 2));
+                return res.status(500).json({ success: false, message: "Failed to create new provider on the fly." });
+            }
         }
 
         const updateData = { status: finalStatus };

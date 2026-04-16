@@ -60,7 +60,13 @@ app.use(
 const limiter = rateLimit({
   max: 100, // Limit each IP to 100 requests per `window`
   windowMs: 15 * 60 * 1000, // 15 minutes
-  message: 'Too many requests from this IP, please try again in 15 minutes!'
+  // FORCE STRICT JSON RESPONSE
+  handler: (req, res, next, options) => {
+    res.status(429).json({
+      success: false,
+      message: 'Too many requests from this device. Please try again in 15 minutes.'
+    });
+  }
 });
 app.use('/api', limiter);
 

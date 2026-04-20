@@ -908,7 +908,7 @@ exports.approveQuote = async (req, res) => {
             return res.status(404).json({ success: false, message: "Booking not found" });
         }
 
-        if (booking.userId.toString() !== req.user._id.toString()) {
+        if (booking.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
             return res.status(403).json({ success: false, message: "Unauthorized" });
         }
 

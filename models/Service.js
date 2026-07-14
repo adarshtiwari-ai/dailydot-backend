@@ -22,6 +22,12 @@ const serviceSchema = new mongoose.Schema({
   mrp: {
     type: Number
   },
+  variants: [{
+    name: { type: String, required: true },
+    price: { type: Number, required: true }, // Stored in paisa
+    mrp: { type: Number },                   // Stored in paisa
+    image: { type: String }
+  }],
   bestCostPrice: {
     type: Number,
     required: false // Initial migration will set this to current price

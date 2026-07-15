@@ -725,7 +725,7 @@ exports.generateInvoice = async (req, res) => {
 
         const invoice = {
             invoiceId: invoiceNumber,
-            date: new Date(booking.createdAt).toLocaleDateString('en-IN'),
+            date: new Date(booking.createdAt || booking.scheduledDate || Date.now()).toLocaleDateString('en-IN'),
             customer: {
                 name: booking.name || booking.userId?.name || 'Customer',
                 phone: booking.phone || booking.userId?.phone || '',
@@ -740,7 +740,9 @@ exports.generateInvoice = async (req, res) => {
                 subtotal: subtotalPaise,
                 cgst: cgstPaise,
                 sgst: sgstPaise,
-                platformFee: platformFeePaise,
+                taxRate: booking.quote?.taxRate || booking.taxRate || 18,
+                platformFee: booking.quote?.platformFee || booking.platformFee || booking.taxDetails?.platformFee || 0,
+                convenienceFee: booking.quote?.convenienceFee || booking.convenienceFee || 0,
                 appliedFees: booking.appliedFees || [],
                 appliedDiscounts: booking.appliedDiscounts || [],
                 grandTotal: grandTotalPaise

@@ -73,7 +73,20 @@ const generateInvoicePDF = (invoiceData, res) => {
     doc.text((Number(invoiceData.summary.subtotal) / 100).toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
     sumY += 15;
 
-    // Dynamic Applied Fees (Platform Fee, Convenience Fee, etc.)
+    // Dynamic Fees
+    if (invoiceData.summary.platformFee > 0) {
+        doc.text('Platform Fee:', summaryX, sumY);
+        doc.text((invoiceData.summary.platformFee / 100).toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
+        sumY += 15;
+    }
+    
+    if (invoiceData.summary.convenienceFee > 0) {
+        doc.text('Convenience Fee:', summaryX, sumY);
+        doc.text((invoiceData.summary.convenienceFee / 100).toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
+        sumY += 15;
+    }
+
+    // Dynamic Applied Fees (Other)
     if (invoiceData.summary.appliedFees && invoiceData.summary.appliedFees.length > 0) {
         invoiceData.summary.appliedFees.forEach(fee => {
             doc.text(`${fee.name}:`, summaryX, sumY);
@@ -91,16 +104,18 @@ const generateInvoicePDF = (invoiceData, res) => {
         });
     }
 
+    const taxHalf = (invoiceData.summary.taxRate || 18) / 2;
+
     // CGST
     if (invoiceData.summary.cgst > 0) {
-        doc.text('CGST (9%):', summaryX, sumY);
+        doc.text(`CGST (${taxHalf}%):`, summaryX, sumY);
         doc.text((Number(invoiceData.summary.cgst) / 100).toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
         sumY += 15;
     }
 
     // SGST
     if (invoiceData.summary.sgst > 0) {
-        doc.text('SGST (9%):', summaryX, sumY);
+        doc.text(`SGST (${taxHalf}%):`, summaryX, sumY);
         doc.text((Number(invoiceData.summary.sgst) / 100).toFixed(2), rightMargin, sumY, { width: valueWidth, align: 'right' });
         sumY += 15;
     }

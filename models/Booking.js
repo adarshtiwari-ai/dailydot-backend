@@ -33,6 +33,10 @@ const bookingSchema = new mongoose.Schema(
           type: String,
           // required: true // Optional if not always available
         },
+        variantId: {
+          type: String,
+          default: null
+        },
       },
     ],
     // Booking Contact Details
@@ -47,6 +51,11 @@ const bookingSchema = new mongoose.Schema(
     bookingNumber: {
       type: String,
       unique: true,
+    },
+    invoiceNumber: {
+      type: String,
+      unique: true,
+      sparse: true
     },
     scheduledDate: {
       type: Date,

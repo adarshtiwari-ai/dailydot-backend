@@ -6,6 +6,7 @@ const Review = require("../models/Review");
 const { validationResult } = require("express-validator");
 const eventHub = require("../services/event.service");
 const { generateInvoicePDF } = require("../services/pdfService");
+const Counter = require("../models/Counter");
 const walletService = require("../services/walletService");
 const notificationService = require("../services/notification.service");
 const settlementService = require("../services/settlementService");
@@ -99,9 +100,11 @@ exports.createBooking = async (req, res) => {
 
             detailedItems.push({
                 serviceId: service._id,
-                name: service.name,
-                price: Math.round(service.price),
+                name: item.name || service.name,
+                variantId: item.variantId || null,
+                price: item.price ? Math.round(item.price) : Math.round(service.price),
                 quantity: item.quantity || 1,
+                category: service.category?.toString(),
             });
 
             // Accumulate itemsSubtotal and bestCostPrice in Paise (no conversion needed as DB is now unified)
@@ -667,55 +670,71 @@ exports.generateInvoice = async (req, res) => {
         //     return res.status(400).json({ success: false, message: "Cannot generate invoice for incomplete bookings." });
         // }
 
-        const documentType = booking.status === "completed" || booking.billingStatus === "invoiced" ? "TAX INVOICE" : "SERVICE ESTIMATE / QUOTE";
+        // Dynamic line items from preserved booking items
+        const lineItems = booking.items.map(item => ({
+            description: item.name,
+            quantity: item.quantity || 1,
+            unitPrice: item.price,
+            amount: item.price * (item.quantity || 1)
+        }));
 
-        // Use strict Paise integers for the JSON payload
-        const baseCostPaise = booking.baseCost || booking.totalAmount || 0;
-        let subtotalPaise = baseCostPaise;
-
-        const lineItems = [
-            {
-                description: "Base Service Cost",
-                amount: baseCostPaise
-            }
-        ];
-
+        // Append materials if they exist
         if (booking.materials && booking.materials.length > 0) {
             booking.materials.forEach(mat => {
-                const matAmount = mat.cost;
-                subtotalPaise += matAmount;
                 lineItems.push({
                     description: `Material: ${mat.name}`,
-                    amount: matAmount,
-                    date: mat.addedAt
+                    quantity: 1,
+                    unitPrice: mat.cost,
+                    amount: mat.cost,
                 });
             });
         }
 
-        // Ensure all amounts are in Paise. No toRupees conversion needed as they are already expected in Paise.
+        // Calculate subtotal from itemized line items
+        const subtotalPaise = lineItems.reduce((sum, item) => sum + item.amount, 0);
+
+        // Ensure all amounts are in Paise.
         const cgstPaise = booking.taxDetails?.cgst || 0;
         const sgstPaise = booking.taxDetails?.sgst || 0;
         const platformFeePaise = booking.taxDetails?.platformFee || 0;
         const grandTotalPaise = booking.finalTotal || booking.totalAmount || 0;
 
-        // Address resolution
+        // Full consignee address resolution
         const customerAddress = booking.serviceAddress
-            ? `${booking.serviceAddress.addressLine1}, ${booking.serviceAddress.city}`
+            ? `${booking.serviceAddress.addressLine1 || ''}, ${booking.serviceAddress.city || ''}, ${booking.serviceAddress.state || ''} - ${booking.serviceAddress.pincode || ''}`
             : (booking.userId.addresses && booking.userId.addresses[0]
                 ? booking.userId.addresses[0].addressLine1
-                : "Address not matched");
+                : "Address not provided");
+
+
+        // Generate or reuse a sequential invoice number
+        let invoiceNumber = booking.invoiceNumber;
+        if (!invoiceNumber) {
+            const counter = await Counter.findByIdAndUpdate(
+                { _id: 'invoiceNumber' },
+                { $inc: { seq: 1 } },
+                { new: true, upsert: true }
+            );
+            const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+            invoiceNumber = `INV-${dateStr}-${counter.seq.toString().padStart(4, '0')}`;
+            booking.invoiceNumber = invoiceNumber;
+            await booking.save();
+        }
+
+        const documentType = booking.status === "completed" || booking.billingStatus === "invoiced" ? "TAX INVOICE" : "SERVICE ESTIMATE / QUOTE";
 
         const invoice = {
-            invoiceId: `INV-${booking._id.toString().slice(-6).toUpperCase()}`,
-            date: new Date(),
+            invoiceId: invoiceNumber,
+            date: new Date(booking.createdAt).toLocaleDateString('en-IN'),
             customer: {
-                name: booking.name || booking.userId.name,
-                phone: booking.phone || booking.userId.phone,
+                name: booking.name || booking.userId?.name || 'Customer',
+                phone: booking.phone || booking.userId?.phone || '',
                 address: customerAddress
             },
             provider: {
                 name: booking.assignedPro ? booking.assignedPro.name : "Unassigned"
             },
+            paymentMethod: booking.paymentMethod ? booking.paymentMethod.toUpperCase() : 'N/A',
             lineItems: lineItems,
             summary: {
                 subtotal: subtotalPaise,

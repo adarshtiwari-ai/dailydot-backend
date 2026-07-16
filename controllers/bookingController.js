@@ -30,8 +30,7 @@ exports.createBooking = async (req, res) => {
             bookingType, 
             paymentMethod,
             amount, // Partial payment amount
-            promoCode,
-            discountAmount = 0
+            promoCode
         } = req.body;
 
         // 1. Partial Payment Validation (₹50 Minimum)
@@ -115,12 +114,18 @@ exports.createBooking = async (req, res) => {
         // Centralized Math Engine (Server-Side)
         const { calculateBillDetails } = require("../services/billingService");
         const billingResult = await calculateBillDetails(itemsSubtotal, [], detailedItems, [], promoCode, bestCostTotal);
-        const {
-            taxAmount,
-            totalDynamicFees,
-            finalTotal,
-            appliedFees,
-            appliedDiscounts
+        const { 
+            subtotal, 
+            discountAmount, 
+            taxAmount, 
+            taxRate, 
+            cgst, 
+            sgst, 
+            platformFee, 
+            convenienceFee, 
+            materialsTotal, 
+            appliedDiscounts, 
+            finalTotal 
         } = billingResult;
 
 
@@ -132,12 +137,17 @@ exports.createBooking = async (req, res) => {
             scheduledTime,
             serviceAddress,
             // Math Engine Fields
-            subtotal: itemsSubtotal,
+            subtotal,
+            platformFee,
+            convenienceFee,
+            cgst,
+            sgst,
+            taxRate,
             taxAmount,
-            appliedFees,
+            materialsTotal,
             appliedDiscounts,
             promoCode: promoCode || null,
-            discountAmount: Math.abs(discountAmount || 0),
+            discountAmount,
             totalAmount: finalTotal, // Saving the real Grand Total
             baseCost: itemsSubtotal, // Consistency for Invoicing
             name: name || null,
@@ -736,16 +746,17 @@ exports.generateInvoice = async (req, res) => {
             },
             paymentMethod: booking.paymentMethod ? booking.paymentMethod.toUpperCase() : 'N/A',
             lineItems: lineItems,
+            // Read directly from the perfectly calculated database fields
             summary: {
-                subtotal: subtotalPaise,
-                cgst: cgstPaise,
-                sgst: sgstPaise,
-                taxRate: booking.quote?.taxRate || booking.taxRate || 18,
-                platformFee: booking.quote?.platformFee || booking.platformFee || booking.taxDetails?.platformFee || 0,
-                convenienceFee: booking.quote?.convenienceFee || booking.convenienceFee || 0,
-                appliedFees: booking.appliedFees || [],
+                subtotal: booking.subtotal || 0,
+                cgst: booking.cgst || 0,
+                sgst: booking.sgst || 0,
+                taxRate: booking.taxRate || 18,
+                platformFee: booking.platformFee || 0,
+                convenienceFee: booking.convenienceFee || 0,
+                materialsTotal: booking.materialsTotal || 0,
                 appliedDiscounts: booking.appliedDiscounts || [],
-                grandTotal: grandTotalPaise
+                grandTotal: booking.totalAmount || booking.finalTotal || 0
             },
             paymentStatus: {
                 status: booking.paymentStatus,

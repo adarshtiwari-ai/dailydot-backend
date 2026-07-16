@@ -77,26 +77,15 @@ const bookingSchema = new mongoose.Schema(
       required: true,
     },
     // Centalized Math Engine Fields
-    subtotal: {
-      type: Number,
-      set: v => Math.round(v),
-      default: 0
-    },
-    taxAmount: {
-      type: Number,
-      set: v => Math.round(v),
-      default: 0
-    },
-    serviceFee: {
-      type: Number,
-      set: v => Math.round(v),
-      default: 0 // Legacy field deprecated
-    },
-    convenienceFee: {
-      type: Number,
-      set: v => Math.round(v),
-      default: 0 // Legacy field deprecated
-    },
+    subtotal: { type: Number, default: 0 },
+    platformFee: { type: Number, default: 0 },
+    convenienceFee: { type: Number, default: 0 },
+    cgst: { type: Number, default: 0 },
+    sgst: { type: Number, default: 0 },
+    taxRate: { type: Number, default: 0 },
+    taxAmount: { type: Number, default: 0 },
+    materialsTotal: { type: Number, default: 0 },
+    discountAmount: { type: Number, default: 0 },
     // Dynamic Invoicing Fields
     baseCost: {
       type: Number, // stored in paise/cents
@@ -119,10 +108,6 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       default: null,
       index: true
-    },
-    discountAmount: {
-      type: Number,
-      default: 0
     },
     finalTotal: {
       type: Number, // stored in paise/cents

@@ -4,7 +4,7 @@ const User = require('../models/User');
 const auth = async (req, res, next) => {
   try {
     console.log('--- Auth Middleware Triggered ---');
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const token = req.header('Authorization')?.replace('Bearer ', '') || req.query.token;
     console.log('Token present:', !!token);
 
     if (!token) {

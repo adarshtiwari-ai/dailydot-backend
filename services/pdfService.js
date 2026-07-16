@@ -13,6 +13,18 @@ const generateInvoicePDF = (invoiceData, res) => {
     // Pipe the document directly to the response
     doc.pipe(res);
 
+    // Handle stream errors to prevent memory leaks
+    doc.on('error', (err) => {
+        console.error('PDF Generation Error:', err);
+        if (!res.headersSent) {
+            res.status(500).json({ message: 'Error generating invoice document' });
+        }
+    });
+
+    res.on('error', (err) => {
+        console.error('Client Stream Error (Disconnected):', err);
+    });
+
     // ═══════════════════════════════════════════
     // HEADER — Firm Details (Left) + Invoice Meta (Right)
     // ═══════════════════════════════════════════

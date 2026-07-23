@@ -101,7 +101,7 @@ exports.createBooking = async (req, res) => {
                 serviceId: service._id,
                 name: item.name || service.name,
                 variantId: item.variantId || null,
-                price: item.price ? Math.round(item.price) : Math.round(service.price),
+                price: Math.round(service.price),
                 quantity: item.quantity || 1,
                 category: service.category?.toString(),
             });
@@ -790,19 +790,32 @@ exports.generateInvoice = async (req, res) => {
 // @access  Public
 exports.calculateCheckoutPricing = async (req, res) => {
     try {
-        const { baseCost, bestCostTotal, items = [], materials = [], adjustments = [], promoCode = null } = req.body;
+        const { items = [], materials = [], adjustments = [], promoCode = null } = req.body;
 
-        if (baseCost === undefined) {
-            return res.status(400).json({
-                success: false,
-                message: "baseCost is required",
-            });
+        let secureBaseCost = 0;
+        let secureBestCostTotal = 0;
+
+        for (const item of items) {
+            // Support consultation bypass for preview
+            if (!item.serviceId && !item.id && item.name === 'Expert Consultation') {
+                continue;
+            }
+
+            const service = await Service.findById(item.serviceId || item.id);
+            if (!service) {
+                return res.status(404).json({
+                    success: false,
+                    message: `Service not found: ${item.serviceId || item.id}`,
+                });
+            }
+            secureBaseCost += Math.round(service.price) * (item.quantity || 1);
+            secureBestCostTotal += Math.round((service.bestCostPrice || service.price)) * (item.quantity || 1);
         }
 
         const { calculateBillDetails } = require("../services/billingService");
 
-        // Pass baseCost, adjustments, items, materials, promoCode, and bestCostTotal
-        const result = await calculateBillDetails(Number(baseCost), adjustments, items, materials, promoCode, bestCostTotal);
+        // Pass securely calculated totals
+        const result = await calculateBillDetails(secureBaseCost, adjustments, items, materials, promoCode, secureBestCostTotal);
 
         // Validation logic for mobile "Apply" button
         if (promoCode && result.appliedDiscounts.length === 0) {

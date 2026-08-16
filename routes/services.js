@@ -186,7 +186,7 @@ router.get("/:id", async (req, res) => {
     const relatedServices = await Service.find({
       category: service.category._id,
       isActive: true
-    }).select('name price mrp duration description images isTopBooked tagId');
+    }).select('name price mrp duration description images isTopBooked tagId variants');
 
     // Group services by tag
     // Structure: { [tagId]: { tagName, services: [] }, "uncategorized": [...] }
